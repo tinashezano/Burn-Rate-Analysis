@@ -1295,11 +1295,26 @@ function txnRow(t){
     el("td", {class:"num" + sgn(t.m)}, fmt(t.m, false)),
     el("td", {}, el("select", {style:"max-width:216px;font-size:12.5px", "aria-label":"Allocation for " + t.n,
         onchange: async ev => {
-          try { await allocate(t.i, ev.target.value || null, undefined); toast(ev.target.value ? "Allocated to " + ev.target.value : "Allocation cleared", "good"); go("transactions"); }
+          try {
+            const code = ev.target.value;
+            if(code === "__create_new__") {
+              ev.target.value = t.c || "";
+              await createCategoryBox(async (newCode) => {
+                await allocate(t.i, newCode, undefined);
+                toast("Allocated to " + newCode, "good");
+                go("transactions");
+              });
+            } else {
+              await allocate(t.i, code || null, undefined);
+              toast(code ? "Allocated to " + code : "Allocation cleared", "good");
+              go("transactions");
+            }
+          }
           catch(err){ toast(err.message, "bad"); }
         }},
         el("option", {value:"", selected:!t.c}, "— unallocated —"),
-        S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " " + c.name))),
+        S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " " + c.name)),
+        el("option", {value:"__create_new__", disabled:false}, "➕ Create new category"))),
       el("span", {class:"chip " + chipCls, style:"margin-left:6px"}, chipTxt)),
     el("td", {class:"dim", style:"font-size:11.5px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
       title:t.src}, t.src || "—"),
@@ -1327,17 +1342,51 @@ async function allocate(id, code, label){
   S.overrides.set(id, body);
 }
 
+async function createCategoryBox(onCreated){
+  let form;
+  modal({title:"Create new category", render: () => (form = el("div", {class:"fgrid"},
+    el("label", {class:"field wide"}, "Code",
+      el("input", {type:"text", name:"code", placeholder:"e.g., 500*", required:true})),
+    el("label", {class:"field wide"}, "Name",
+      el("input", {type:"text", name:"name", placeholder:"e.g., Miscellaneous", required:true})),
+    el("label", {class:"field wide"}, "Section",
+      el("select", {name:"section", required:true},
+        el("option", {value:""}, "— select section —"),
+        SECTION_ORDER.map(s => el("option", {value:s}, SECTIONS[s].title)))))),
+    actions:[{label:"Cancel"}, {label:"Create", kind:"go", run: async () => {
+      const v = formOf(form);
+      if(!v.code || !v.name || !v.section) {
+        throw new Error("All fields are required");
+      }
+      if(S.coaBy.has(v.code)) {
+        throw new Error("Code " + v.code + " already exists");
+      }
+      const newCat = {code:v.code, name:v.name, section:v.section, sort:999};
+      S.coa.push(newCat);
+      S.coaBy.set(v.code, newCat);
+      const config = await store.getDoc("meta/config");
+      config.coa = S.coa;
+      await store.setDoc("meta/config", config);
+      toast("Category created: " + v.code, "good");
+      if(onCreated) onCreated(v.code);
+    }}]});
+}
+
 function bulkBox(){
   let form;
   modal({title:"Allocate " + S.picked.size + " transaction" + (S.picked.size === 1 ? "" : "s"),
     render: () => (form = el("div", {class:"fgrid"},
       el("label", {class:"field wide"}, "Category",
         el("select", {name:"code"}, el("option", {value:""}, "— clear the allocation —"),
-          S.coa.map(c => el("option", {value:c.code}, c.code + " — " + c.name)))),
+          S.coa.map(c => el("option", {value:c.code}, c.code + " — " + c.name)),
+          el("option", {value:"__create_new__"}, "➕ Create new category"))),
       el("label", {class:"field wide"}, "Note (optional)",
         el("input", {type:"text", name:"label", placeholder:"Leave blank to keep existing notes"})))),
     actions:[{label:"Cancel"}, {label:"Allocate", kind:"go", run: async () => {
       const v = formOf(form);
+      if(v.code === "__create_new__") {
+        throw new Error("Please create a category first using the dropdown option");
+      }
       const ids = [...S.picked];
       for(const id of ids) await allocate(id, v.code || null, v.label || undefined);
       toast(ids.length + " transactions allocated", "good");
@@ -1360,7 +1409,8 @@ function txnDetail(t){
     el("div", {class:"fgrid"},
       el("label", {class:"field wide"}, "Category",
         el("select", {name:"code"}, el("option", {value:""}, "— unallocated —"),
-          S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " — " + c.name)))),
+          S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " — " + c.name)),
+          el("option", {value:"__create_new__"}, "➕ Create new category"))),
       el("label", {class:"field wide"}, "Note", el("input", {type:"text", name:"label", value:t.l || ""})),
       el("label", {class:"check wide"}, el("input", {type:"checkbox", name:"similar"}),
         "Apply to every transaction with the same narrative on this account"),
@@ -1368,6 +1418,9 @@ function txnDetail(t){
         "Remember this as a rule for future imports")))),
     actions:[{label:"Cancel"}, {label:"Save", kind:"go", run: async () => {
       const v = formOf(form);
+      if(v.code === "__create_new__") {
+        throw new Error("Please create a category first using the dropdown option");
+      }
       await allocate(t.i, v.code || null, v.label);
       let also = 0;
       if(v.similar && v.code){
