@@ -1,0 +1,1927 @@
+<title>Qwili Burn Rate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* ── tokens ─────────────────────────────────────────────────────────────
+   Slate-biased neutrals (a ledger paper, not a pure grey), a deep petrol
+   accent for chrome, and the data-mark hues validated for both surfaces. */
+:root{
+  color-scheme: light;
+  --plane:#eceff4; --surface:#fbfcfd; --raised:#f4f6f9; --sunken:#e6eaf0;
+  --rule:#d5dae2; --rule-firm:#b7bfcb;
+  --ink:#101820; --ink-2:#4a5563; --ink-3:#78828f;
+  --accent:#0d4f66; --accent-ink:#0d4f66; --accent-wash:#e2edf2;
+  --mark-1:#2a78d6; --mark-2:#eb6834; --mark-3:#1baf7a;
+  --good:#0ca30c; --warn:#fab219; --warn-ink:#7a5200; --crit:#d03b3b;
+  --shadow:0 1px 1px rgba(16,24,32,.04), 0 2px 10px rgba(16,24,32,.05);
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --body:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display:"Archivo", "Public Sans", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --plane:#0b0e13; --surface:#12161c; --raised:#1a1f27; --sunken:#232932;
+    --rule:#2a313b; --rule-firm:#3d4652;
+    --ink:#eef2f7; --ink-2:#a7b2c0; --ink-3:#78838f;
+    --accent:#5fb3d1; --accent-ink:#8fcde3; --accent-wash:#132a35;
+    --mark-1:#3987e5; --mark-2:#d95926; --mark-3:#199e70;
+    --warn-ink:#fab219;
+    --shadow:0 1px 1px rgba(0,0,0,.4), 0 2px 12px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0b0e13; --surface:#12161c; --raised:#1a1f27; --sunken:#232932;
+  --rule:#2a313b; --rule-firm:#3d4652;
+  --ink:#eef2f7; --ink-2:#a7b2c0; --ink-3:#78838f;
+  --accent:#5fb3d1; --accent-ink:#8fcde3; --accent-wash:#132a35;
+  --mark-1:#3987e5; --mark-2:#d95926; --mark-3:#199e70;
+  --warn-ink:#fab219;
+  --shadow:0 1px 1px rgba(0,0,0,.4), 0 2px 12px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-family:var(--display);font-weight:600;letter-spacing:-.015em;text-wrap:balance}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;font-size:12.5px}
+.code{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.neg{color:var(--crit)} .pos{color:var(--good)} .dim{color:var(--ink-3)}
+
+/* ── shell ───────────────────────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--surface);border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:2px;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.mark{padding:0 8px 18px;display:flex;flex-direction:column;gap:2px}
+.mark .n{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.02em}
+.mark .e{font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+.nav{border:0;background:none;color:var(--ink-2);font:inherit;font-size:13.5px;text-align:left;padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:9px}
+.nav:hover{background:var(--raised);color:var(--ink)}
+.nav[aria-current="page"]{background:var(--accent-wash);color:var(--accent-ink);font-weight:600}
+.nav .tally{margin-left:auto;font-family:var(--mono);font-size:11px;background:var(--crit);color:#fff;padding:0 6px;border-radius:8px;line-height:17px}
+.railfoot{margin-top:auto;padding:12px 8px 0;border-top:1px solid var(--rule);font-size:11.5px;color:var(--ink-3);display:flex;flex-direction:column;gap:5px}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topline{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--rule);padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.topline h2{font-size:16px}
+.topline .sub{font-size:12.5px;color:var(--ink-3)}
+.topline .grow{margin-left:auto}
+.content{padding:22px 24px 60px;display:flex;flex-direction:column;gap:18px}
+
+/* ── panels ──────────────────────────────────────────────────────────── */
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;box-shadow:var(--shadow)}
+.panel > .head{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.panel > .head h3{font-size:13.5px}
+.panel > .head .sub{font-size:12px;color:var(--ink-3)}
+.panel > .head .grow{margin-left:auto}
+.panel > .pad{padding:16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(370px,1fr));gap:18px}
+
+/* Figures lead the page only because they are the point of a burn report. */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.tile{background:var(--surface);padding:13px 16px 14px}
+.tile .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);font-weight:600}
+.tile .v{font-family:var(--display);font-size:23px;font-weight:600;letter-spacing:-.025em;margin-top:6px;font-variant-numeric:tabular-nums}
+.tile .s{font-size:11.5px;color:var(--ink-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.lead{background:var(--raised)}
+
+/* ── notes: a severity stripe carries state without relying on hue ───── */
+.note{display:flex;gap:11px;padding:10px 14px;border:1px solid var(--rule);border-left-width:3px;border-radius:5px;background:var(--surface);font-size:13px}
+.note b{font-weight:600}
+.note .ico{font-family:var(--mono);font-weight:500;flex:none;width:14px;text-align:center}
+.note.ok{border-left-color:var(--good)}
+.note.warn{border-left-color:var(--warn)} .note.warn .ico{color:var(--warn-ink)}
+.note.crit{border-left-color:var(--crit)} .note.crit .ico{color:var(--crit)}
+.note.info{border-left-color:var(--accent)} .note.info .ico{color:var(--accent-ink)}
+.notes{display:flex;flex-direction:column;gap:8px}
+
+/* ── controls ────────────────────────────────────────────────────────── */
+button,select,input,textarea{font:inherit;color:inherit}
+.btn{border:1px solid var(--rule-firm);background:var(--surface);border-radius:5px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--raised)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.go{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.go,:root:not([data-theme="light"]) .btn.go{color:#08181f}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .btn.go{color:#fff}}
+.btn.go:hover:not(:disabled){filter:brightness(1.12)}
+.btn.bad{color:var(--crit);border-color:var(--crit);background:transparent}
+.btn.sm{padding:3px 8px;font-size:12px}
+select,input[type=text],input[type=search],input[type=number]{background:var(--surface);border:1px solid var(--rule-firm);border-radius:5px;padding:6px 9px;font-size:13px;max-width:100%}
+.field{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600}
+.field > select,.field > input{text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink)}
+.bar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.check{display:flex;align-items:center;gap:7px;font-size:13px}
+
+/* ── tables ──────────────────────────────────────────────────────────── */
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;text-align:left}
+thead th{position:sticky;top:0;z-index:5;background:var(--sunken);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);font-weight:600;white-space:nowrap}
+tbody tr{border-top:1px solid var(--rule)}
+.rows tbody tr:hover{background:var(--raised)}
+
+/* Burn Rate report: the code and line-name columns stay put while the
+   month columns scroll sideways. */
+.report td,.report th{padding:5px 10px}
+.report tbody tr{border-top:0;background:var(--surface)}
+.report tbody tr:hover{background:var(--raised)}
+.report td.c{width:64px;position:sticky;left:0;z-index:2;background:inherit}
+.report td.l,.report th.l{min-width:288px;position:sticky;left:64px;z-index:2;background:inherit;box-shadow:1px 0 0 var(--rule)}
+.report th.c{position:sticky;left:0;z-index:6}
+.report th.l{z-index:6;background:var(--sunken)}
+.report th.c{background:var(--sunken)}
+.report th.m{text-align:right}
+.report th.m .mo{display:block;font-family:var(--display);font-size:13px;color:var(--ink);text-transform:none;letter-spacing:-.01em;font-weight:600}
+.report tr.rule td{border-top:1px solid var(--rule-firm);font-weight:600;background:var(--raised)}
+.report tr.rule td.c,.report tr.rule td.l{background:var(--raised)}
+.report tr.key td{border-top:1px solid var(--rule-firm);border-bottom:1px solid var(--rule-firm);font-weight:700;font-size:13.5px;background:var(--sunken)}
+.report tr.key td.c,.report tr.key td.l{background:var(--sunken)}
+.report tr.band td{padding-top:15px;font-weight:600;font-size:12.5px;color:var(--ink-2)}
+.report tr.band td span{position:sticky;left:10px;display:inline-block}
+.report tr.gap td{height:9px;padding:0}
+.report tr.sub td{color:var(--ink-2)}
+.report td.pct{width:70px;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right}
+.report tr.act{cursor:pointer}
+.report tr.act:hover td.l{text-decoration:underline;text-underline-offset:3px}
+
+/* ── chips ───────────────────────────────────────────────────────────── */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;border:1px solid var(--rule-firm);color:var(--ink-2);white-space:nowrap}
+.chip.ok{border-color:var(--good);color:var(--good)}
+.chip.bad{border-color:var(--crit);color:var(--crit)}
+.chip.mid{border-color:var(--warn);color:var(--warn-ink)}
+.chip.on{border-color:var(--accent);color:var(--accent-ink)}
+
+/* ── charts ──────────────────────────────────────────────────────────── */
+svg.chart{display:block;width:100%;height:auto}
+svg .grid{stroke:var(--rule)}
+svg .ax{fill:var(--ink-3);font-size:10px;font-family:var(--body)}
+svg .dl{fill:var(--ink-2);font-size:10px;font-family:var(--mono)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);margin-top:9px;align-items:center}
+.legend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px}
+.compo{display:flex;flex-direction:column;gap:7px}
+.compo .row{display:grid;grid-template-columns:52px minmax(0,1fr) 104px 52px;gap:12px;align-items:center}
+.compo .track{height:7px;background:var(--sunken);border-radius:4px;overflow:hidden}
+.compo .fill{height:100%;background:var(--mark-2);border-radius:4px}
+.compo .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+
+/* ── misc ────────────────────────────────────────────────────────────── */
+.drop{border:1.5px dashed var(--rule-firm);border-radius:6px;padding:32px;text-align:center;color:var(--ink-2);cursor:pointer;background:var(--surface)}
+.drop.over{border-color:var(--accent);background:var(--accent-wash);color:var(--accent-ink)}
+.drop b{display:block;font-family:var(--display);font-size:15px;color:var(--ink);margin-bottom:3px}
+.hollow{padding:34px;text-align:center;color:var(--ink-3)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--rule-firm);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation-duration:2.4s}}
+.skel{background:linear-gradient(90deg,var(--raised),var(--sunken),var(--raised));border-radius:4px;height:12px}
+#toasts{position:fixed;right:18px;bottom:18px;z-index:100;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--rule-firm);border-left:3px solid var(--accent);border-radius:5px;padding:9px 14px;box-shadow:var(--shadow);font-size:13px;max-width:370px}
+.toast.bad{border-left-color:var(--crit)} .toast.good{border-left-color:var(--good)}
+dialog{border:1px solid var(--rule-firm);border-radius:8px;padding:0;background:var(--surface);color:var(--ink);width:min(600px,calc(100vw - 32px));box-shadow:0 16px 48px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(11,14,19,.5)}
+dialog .dh{padding:14px 18px;border-bottom:1px solid var(--rule);font-family:var(--display);font-weight:600}
+dialog .db{padding:18px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:13px}
+dialog .df{padding:12px 18px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:12px}
+.fgrid .wide{grid-column:1/-1}
+.sel{width:34px}
+tr.picked{background:var(--accent-wash) !important}
+.ellip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--rule)}
+  .mark{padding:0 10px 0 4px}
+  .railfoot{display:none}
+}
+</style>
+
+<div class="app">
+  <nav class="rail" id="rail">
+    <div class="mark"><span class="n">Burn Rate</span><span class="e" id="entity">—</span></div>
+    <button class="nav" data-v="dashboard" aria-current="page">Dashboard</button>
+    <button class="nav" data-v="transactions">Transactions<span class="tally" id="tally" hidden>0</span></button>
+    <button class="nav" data-v="accounts">Reconciliation</button>
+    <button class="nav" data-v="import">Import</button>
+    <button class="nav" data-v="rules">Rules</button>
+    <div class="railfoot">
+      <span id="storeState">Connecting…</span>
+      <span id="storeCount"></span>
+    </div>
+  </nav>
+  <div class="main">
+    <header class="topline" id="topline">
+      <div><h2 id="viewTitle">Burn Rate Analysis</h2><div class="sub" id="viewSub">Loading the transaction database…</div></div>
+      <div class="grow"></div>
+      <div id="toplineTools"></div>
+    </header>
+    <div class="content" id="view">
+      <div class="tiles">
+        <div class="tile lead"><div class="k">Cash on hand</div><div class="v"><span class="skel" style="display:block;width:70%;height:22px"></span></div></div>
+        <div class="tile"><div class="k">Net cash burn</div><div class="v"><span class="skel" style="display:block;width:70%;height:22px"></span></div></div>
+        <div class="tile"><div class="k">Gross burn</div><div class="v"><span class="skel" style="display:block;width:70%;height:22px"></span></div></div>
+        <div class="tile"><div class="k">Runway</div><div class="v"><span class="skel" style="display:block;width:70%;height:22px"></span></div></div>
+      </div>
+      <div class="panel"><div class="hollow"><span class="spin"></span> Reading the transaction database…</div></div>
+    </div>
+  </div>
+</div>
+<div id="toasts"></div>
+<dialog id="modal"></dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════════
+   Burn Rate Analysis — bank statement import, allocation, cash-burn
+   reporting and bank reconciliation.
+
+   The report follows the "Burn Rate" tab of the source workbook: opening
+   cash by account, income, cost of sale, gross margin, other income,
+   expenditure, surplus/deficit, balance sheet movements, closing cash,
+   closing per bank statements, the reconciling difference and gross burn,
+   with a "% of Total Burn" column beside every month.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── formatting ──────────────────────────────────────────────────────── */
+const F2 = new Intl.NumberFormat("en-ZA", {minimumFractionDigits:2, maximumFractionDigits:2});
+const F0 = new Intl.NumberFormat("en-ZA", {maximumFractionDigits:0});
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+
+function fmt(n, blankZero = true){
+  if(n === null || n === undefined || Number.isNaN(n)) return "—";
+  if(blankZero && Math.abs(n) < 0.005) return "—";
+  return n < 0 ? "(" + F2.format(Math.abs(n)) + ")" : F2.format(n);
+}
+function rand(n, blankZero = false){
+  if(n === null || n === undefined || Number.isNaN(n)) return "—";
+  const s = fmt(n, blankZero);
+  return s === "—" ? s : (s[0] === "(" ? "(R " + s.slice(1) : "R " + s);
+}
+const pct = v => (v === null || v === undefined || !isFinite(v) || Math.abs(v) < 0.00005) ? "" : (v*100).toFixed(1) + "%";
+const sgn = n => (n === null || n === undefined || Math.abs(n) < 0.005) ? "" : (n < 0 ? " neg" : "");
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const FULLMON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function moLabel(p, long){
+  if(!p) return "—";
+  const [y,m] = p.split("-").map(Number);
+  return (long ? FULLMON[m-1] : MON[m-1]) + " " + y;
+}
+function dayLabel(d){
+  if(!d) return "—";
+  const [y,m,dd] = d.split("-").map(Number);
+  return String(dd).padStart(2,"0") + " " + MON[m-1] + " " + String(y).slice(2);
+}
+const periodOf = iso => iso.slice(0,7) + "-01";
+
+/* ── DOM ─────────────────────────────────────────────────────────────── */
+function el(tag, props, ...kids){
+  const n = document.createElement(tag);
+  for(const k in (props||{})){
+    const v = props[k];
+    if(v === null || v === undefined || v === false) continue;
+    if(k === "class") n.className = v;
+    else if(k === "text") n.textContent = v;
+    else if(k === "style") n.style.cssText = v;
+    else if(k.slice(0,2) === "on" && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
+    else if(v === true) n.setAttribute(k, "");
+    else n.setAttribute(k, v);
+  }
+  for(const c of kids.flat(Infinity)){
+    if(c === null || c === undefined || c === false) continue;
+    n.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return n;
+}
+const wipe = n => { while(n.firstChild) n.removeChild(n.firstChild); return n; };
+
+function toast(msg, kind){
+  const n = el("div", {class: "toast " + (kind||""), role: "status"}, msg);
+  document.getElementById("toasts").append(n);
+  setTimeout(() => { n.style.transition = "opacity .3s"; n.style.opacity = "0"; }, kind === "bad" ? 5200 : 2800);
+  setTimeout(() => n.remove(), kind === "bad" ? 5600 : 3200);
+}
+
+function modal(opts){
+  const dlg = document.getElementById("modal");
+  wipe(dlg);
+  const body = el("div", {class:"db"});
+  body.append(opts.render());
+  dlg.append(
+    el("div", {class:"dh"}, opts.title),
+    body,
+    el("div", {class:"df"}, (opts.actions||[]).map(a => el("button", {
+      class: "btn " + (a.kind||""),
+      onclick: async ev => {
+        const b = ev.currentTarget; b.disabled = true;
+        try { if(await a.run?.() !== false) dlg.close(); }
+        catch(err){ toast(err.message || String(err), "bad"); }
+        finally { b.disabled = false; }
+      }
+    }, a.label)))
+  );
+  dlg.showModal();
+  body.querySelector("input,select,textarea,button")?.focus();
+  return dlg;
+}
+function formOf(root){
+  const o = {};
+  for(const f of root.querySelectorAll("[name]")) o[f.name] = f.type === "checkbox" ? f.checked : f.value;
+  return o;
+}
+function confirmBox(title, msg, label){
+  return new Promise(res => {
+    let done = false;
+    const d = modal({title, render: () => el("p",{style:"margin:0"}, msg), actions:[
+      {label:"Cancel", run:()=>{done=true;res(false);}},
+      {label:label||"Confirm", kind:"bad", run:()=>{done=true;res(true);}},
+    ]});
+    d.addEventListener("close", () => { if(!done) res(false); }, {once:true});
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Statement parsing
+   ════════════════════════════════════════════════════════════════════════ */
+const HEADERS = {
+  date:[/^(transaction\s*)?date$/i,/^posting date$/i,/^value date$/i,/^txn date$/i],
+  description:[/^(statement\s*)?(reference|description|narrative|details|payee|particulars)$/i,/^transaction (description|reference|details)$/i],
+  amount:[/^(transaction\s*)?amount$/i,/^value$/i,/^amount \(zar\)$/i],
+  debit:[/^debits?$/i,/^money out$/i,/^withdrawals?$/i,/^payments?$/i],
+  credit:[/^credits?$/i,/^money in$/i,/^deposits?$/i,/^receipts?$/i],
+  balance:[/^bala?\s*nce$/i,/^running balance$/i,/^closing balance$/i],
+  code:[/^outset allocation$/i,/^allocation code$/i,/^account code$/i,/^coa$/i],
+  label:[/^allocation$/i,/^category$/i,/^classification$/i],
+  period:[/^month$/i,/^period$/i],
+};
+function headerRole(v){
+  const s = String(v ?? "").trim();
+  if(!s) return null;
+  for(const role in HEADERS) if(HEADERS[role].some(rx => rx.test(s))) return role;
+  return null;
+}
+
+/** Reads a number written in any of the conventions bank exports use. */
+function readNumber(v){
+  if(v === null || v === undefined || v === "") return null;
+  if(typeof v === "number") return isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if(!s) return null;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  if(/(^|\s)(dr|debit)$/i.test(s)) neg = true;
+  s = s.replace(/(cr|dr|credit|debit)$/i, "").trim();
+  s = s.replace(/[R$€£\s ']/g, "");
+  if(s[0] === "-"){ neg = !neg; s = s.slice(1); }
+  else if(s[0] === "+") s = s.slice(1);
+  const comma = s.lastIndexOf(","), dot = s.lastIndexOf(".");
+  if(comma >= 0 && dot >= 0){
+    if(comma > dot){
+      s = s.replace(/\./g, "");
+      const i = s.lastIndexOf(",");
+      s = s.slice(0,i).replace(/,/g,"") + "." + s.slice(i+1);
+    } else s = s.replace(/,/g, "");
+  } else if(comma >= 0){
+    if(/,\d{1,2}$/.test(s)){
+      const i = s.lastIndexOf(",");
+      s = s.slice(0,i).replace(/,/g,"") + "." + s.slice(i+1);
+    } else s = s.replace(/,/g, "");
+  } else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = parseFloat(s);
+  return isFinite(n) ? (neg ? -n : n) : null;
+}
+
+const EXCEL_EPOCH = Date.UTC(1899,11,30);
+/** Reads a date cell without committing to an order for ambiguous text. */
+function readDate(v, dayFirst){
+  if(v === null || v === undefined || v === "") return null;
+  if(v instanceof Date && !isNaN(v)) return {y:v.getFullYear(), m:v.getMonth()+1, d:v.getDate()};
+  if(typeof v === "number" && v > 20000 && v < 80000){
+    const dt = new Date(EXCEL_EPOCH + Math.round(v*86400000));
+    return {y:dt.getUTCFullYear(), m:dt.getUTCMonth()+1, d:dt.getUTCDate()};
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return {y:+m[1], m:+m[2], d:+m[3]};
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if(m){
+    let a = +m[1], b = +m[2], y = +m[3];
+    if(y < 100) y += y < 70 ? 2000 : 1900;
+    if(a > 12) return {y, m:b, d:a};              // a day above 12 settles it
+    if(b > 12) return {y, m:a, d:b};
+    return dayFirst ? {y, m:b, d:a, amb:true} : {y, m:a, d:b, amb:true};
+  }
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})$/);
+  if(m){
+    const i = MON.findIndex(x => x.toLowerCase() === m[2].slice(0,3).toLowerCase());
+    if(i >= 0){ let y = +m[3]; if(y < 100) y += 2000; return {y, m:i+1, d:+m[1]}; }
+  }
+  const t = Date.parse(s);
+  if(!isNaN(t)){ const dt = new Date(t); return {y:dt.getFullYear(), m:dt.getMonth()+1, d:dt.getDate()}; }
+  return null;
+}
+const isoOf = p => p.y + "-" + String(p.m).padStart(2,"0") + "-" + String(p.d).padStart(2,"0");
+
+const OPEN_RE = /(brought forward|opening balance|balance b\/?f|b\/?fwd|balance brought)/i;
+const CLOSE_RE = /(carried forward|closing balance|balance c\/?f|c\/?fwd)/i;
+
+/** Splits a sheet into statement blocks — one file may hold several accounts. */
+function findBlocks(grid){
+  const heads = [];
+  for(let r = 0; r < grid.length; r++){
+    const roles = new Set((grid[r]||[]).map(headerRole).filter(Boolean));
+    const amt = roles.has("amount") || (roles.has("debit") && roles.has("credit"));
+    if(roles.has("date") && (amt || roles.has("description"))) heads.push(r);
+  }
+  return heads.map((hr, i) => {
+    const cols = {};
+    (grid[hr]||[]).forEach((cell, c) => {
+      const role = headerRole(cell);
+      if(role && cols[role] === undefined) cols[role] = c;
+    });
+    return {headerRow:hr, endRow: i+1 < heads.length ? heads[i+1] : grid.length, cols,
+            hint: hintAbove(grid, hr, i ? heads[i-1] : 0)};
+  });
+}
+function hintAbove(grid, hr, floor){
+  let name = "", number = "";
+  for(let r = hr; r >= Math.max(0, floor); r--){
+    const text = (grid[r]||[]).map(v => v === null || v === undefined ? "" : String(v)).join(" ").trim();
+    if(!text) continue;
+    const num = text.match(/\b(\d{8,20})\b/);
+    if(num && !number) number = num[1];
+    const named = text.match(/account (?:description|name)\s*:?\s*(.+)/i);
+    if(named && !name) name = named[1].replace(/\s{2,}/g," ").trim();
+    if(!name && /acc(?:ount)?\b/i.test(text) && !/^account number/i.test(text) && text.length < 90){
+      const c = text.replace(/account (number|description|name)\s*:?/ig,"").trim();
+      if(c && !/^\d+$/.test(c)) name = c;
+    }
+    if(name && number) break;
+  }
+  name = name.replace(/\b(date|description|amount|balance|reference)\b/ig,"").replace(/\s{2,}/g," ").trim();
+  return {name, number};
+}
+
+function parseStatement(data, filename, opts){
+  const o = opts || {};
+  const dayFirst = o.dayFirst !== false, swap = !!o.swapDayMonth;
+  const csv = /\.(csv|txt|tsv)$/i.test(filename);
+  const wb = csv
+    ? XLSX.read(new TextDecoder().decode(data), {type:"string", raw:true})
+    : XLSX.read(data, {type:"array", cellDates:true});
+  const sheets = [];
+  for(const name of wb.SheetNames){
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:null, blankrows:true, raw:true});
+    if(!grid.length) continue;
+    const blocks = findBlocks(grid).map(b => readBlock(grid, b, dayFirst, swap)).filter(b => b.rows.length);
+    if(blocks.length) sheets.push({name, blocks});
+  }
+  return {sheets};
+}
+
+function readBlock(grid, block, dayFirst, swap){
+  const c = block.cols, rows = [];
+  let opening = null, closing = null, lastBal = null, ambiguous = 0;
+  for(let r = block.headerRow + 1; r < block.endRow; r++){
+    const row = grid[r] || [];
+    const desc = c.description !== undefined ? String(row[c.description] ?? "").trim() : "";
+    const bal = c.balance !== undefined ? readNumber(row[c.balance]) : null;
+    let amt = c.amount !== undefined ? readNumber(row[c.amount]) : null;
+    if(amt === null && (c.debit !== undefined || c.credit !== undefined)){
+      const dr = c.debit !== undefined ? readNumber(row[c.debit]) : null;
+      const cr = c.credit !== undefined ? readNumber(row[c.credit]) : null;
+      if(dr !== null || cr !== null) amt = (cr ?? 0) - Math.abs(dr ?? 0);
+    }
+    if(OPEN_RE.test(desc)){ opening = bal ?? amt ?? opening; continue; }
+    if(CLOSE_RE.test(desc)){ closing = bal ?? closing; continue; }
+    if(amt === null) continue;
+    let p = c.date !== undefined ? readDate(row[c.date], dayFirst) : null;
+    if(!p) continue;
+    if(p.amb) ambiguous++;
+    if(swap && p.d <= 12) p = {y:p.y, m:p.d, d:p.m};
+    const date = isoOf(p);
+    if(isNaN(Date.parse(date))) continue;
+    let per = periodOf(date);
+    if(c.period !== undefined){
+      const q = readDate(row[c.period], dayFirst);
+      if(q) per = q.y + "-" + String(q.m).padStart(2,"0") + "-01";
+    }
+    if(bal !== null) lastBal = bal;
+    rows.push({row:r+1, date, period:per, description:desc, amount:r2(amt), balance:bal,
+               code: c.code !== undefined ? (String(row[c.code] ?? "").trim() || null) : null,
+               label: c.label !== undefined ? String(row[c.label] ?? "").trim() : ""});
+  }
+  // A descending statement lists the newest row first.
+  const desc = rows.length >= 2 && rows[0].date > rows[rows.length-1].date;
+  if(desc) rows.reverse();
+  if(opening === null && desc && rows.length && rows[0].balance !== null)
+    opening = r2(rows[0].balance - rows[0].amount);
+  if(closing === null) closing = desc ? (rows[rows.length-1]?.balance ?? null) : lastBal;
+  const months = [...new Set(rows.map(r => r.period))].sort();
+  return Object.assign({}, block, {rows, opening, closing, descending:desc, months,
+    // Statements normally cover one month; a wider spread usually means the
+    // source file stored day and month the wrong way round.
+    dateSuspect: months.length > 2 && ambiguous > 0});
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Categorisation — rules first, then how the same narrative was allocated
+   before. Reference numbers and dates are stripped so payee variants of the
+   same narrative collapse together.
+   ════════════════════════════════════════════════════════════════════════ */
+function normalise(s){
+  return String(s || "").toLowerCase()
+    .replace(/[*#]/g, " ")
+    .replace(/\b\d{1,2}[\/-]\d{1,2}([\/-]\d{2,4})?\b/g, " ")
+    .replace(/\d{4,}/g, " ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\b(pty|ltd|inc|cc|the|and|ref|payment|pmt|eft|debit|credit|card|purchase|za|zar)\b/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+const tokensOf = s => normalise(s).split(" ").filter(t => t.length > 2);
+function similarity(a, b){
+  const A = new Set(tokensOf(a)), B = new Set(tokensOf(b));
+  if(!A.size || !B.size) return 0;
+  let hit = 0;
+  A.forEach(t => { if(B.has(t)) hit++; });
+  return hit / (A.size + B.size - hit);
+}
+function ruleHits(rule, desc){
+  const d = String(desc || "");
+  if(rule.match === "exact") return normalise(d) === normalise(rule.pattern);
+  if(rule.match === "starts") return normalise(d).startsWith(normalise(rule.pattern));
+  if(rule.match === "regex"){ try { return new RegExp(rule.pattern, "i").test(d); } catch { return false; } }
+  return normalise(d).includes(normalise(rule.pattern));
+}
+
+/** Builds the allocation history once, for bulk categorisation. */
+function learnedIndex(txns){
+  const hist = new Map();
+  for(const t of txns){
+    if(!t.c || !t.n) continue;
+    const key = normalise(t.n);
+    if(!key) continue;
+    let e = hist.get(key);
+    if(!e){ e = {total:0, counts:new Map(), top:null, byAcc:new Map()}; hist.set(key, e); }
+    tallyInto(e, t);
+    let a = e.byAcc.get(t.a);
+    if(!a){ a = {total:0, counts:new Map(), top:null}; e.byAcc.set(t.a, a); }
+    tallyInto(a, t);
+  }
+  return hist;
+}
+function tallyInto(b, t){
+  b.total++;
+  const cur = b.counts.get(t.c) || {code:t.c, n:0, label:t.l || ""};
+  cur.n++;
+  if(t.l && !cur.label) cur.label = t.l;
+  b.counts.set(t.c, cur);
+  if(!b.top || cur.n > b.top.n) b.top = cur;
+}
+
+function suggest(desc, accCode, ctx){
+  for(const rule of ctx.rules){
+    if(!rule.active) continue;
+    if(rule.account && rule.account !== accCode) continue;
+    if(ruleHits(rule, desc))
+      return {code:rule.code, label:rule.label || "", confidence:0.99, why:'rule: ' + rule.match + ' "' + rule.pattern + '"'};
+  }
+  const key = normalise(desc);
+  if(key){
+    const e = ctx.hist.get(key);
+    if(e){
+      const scoped = e.byAcc.get(accCode);
+      const pick = (scoped && scoped.top) || e.top;
+      if(pick){
+        const pool = scoped || e;
+        return {code:pick.code, label:pick.label || "",
+                confidence: Math.min(0.97, 0.6 + 0.37 * (pick.n / pool.total)),
+                why: "matches " + pick.n + " previously allocated transaction" + (pick.n === 1 ? "" : "s") + " with the same narrative"};
+      }
+    }
+    let best = null;
+    ctx.hist.forEach((entry, k) => {
+      const s = similarity(key, k);
+      if(s >= 0.6 && (!best || s > best.s)) best = {s, entry, k};
+    });
+    if(best && best.entry.top)
+      return {code:best.entry.top.code, label:best.entry.top.label || "",
+              confidence: Math.min(0.85, best.s * 0.9),
+              why: 'similar to "' + best.k + '" (' + Math.round(best.s*100) + "% match)"};
+  }
+  return {code:null, label:"", confidence:0, why:"no rule or previous allocation matched"};
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   The store — artifact db, with an in-memory fallback so the page still
+   works when the shared database cannot be reached.
+   ════════════════════════════════════════════════════════════════════════ */
+const store = {
+  db: null,
+  ready: false,
+  async connect(){
+    try { this.db = await claude.use("db"); }
+    catch { this.db = null; }
+    this.ready = true;
+    return this.db;
+  },
+  async getDoc(path){
+    if(!this.db) return null;
+    const snap = await this.db.doc(path).get();
+    return snap.exists ? snap.data() : null;
+  },
+  async setDoc(path, body){
+    if(!this.db) throw new Error("The shared database is not available in this view, so the change was not saved.");
+    await this.db.doc(path).set(body);
+  },
+  async listCollection(path){
+    if(!this.db) return [];
+    const snap = await this.db.collection(path).get();
+    return snap.docs.filter(d => d.exists).map(d => Object.assign({_id:d.id}, d.data()));
+  },
+  async del(path){
+    if(!this.db) return;
+    await this.db.doc(path).delete();
+  },
+};
+
+/* ── application state ───────────────────────────────────────────────── */
+const S = {
+  entity: "", accounts: [], coa: [], coaBy: new Map(),
+  periodsMeta: {},              // "ACCT|period" -> {o, s}
+  chunks: new Map(),            // period -> rows[]
+  overrides: new Map(),         // txn id -> {c, l, by}
+  rules: [],
+  imports: [],
+  view: "dashboard",
+  focus: null,
+  filters: {status:"all", offset:0, sort:"date", dir:"desc"},
+  picked: new Set(),
+  degraded: false,
+};
+
+async function load(){
+  const db = await store.connect();
+  if(!db){
+    S.degraded = true;
+    document.getElementById("storeState").textContent = "Shared database unavailable";
+    return;
+  }
+  const [config, periods, rules, imports] = await Promise.all([
+    store.getDoc("meta/config"),
+    store.getDoc("meta/periods"),
+    store.listCollection("rules"),
+    store.listCollection("imports"),
+  ]);
+  if(config){
+    S.entity = config.entity || "";
+    S.accounts = config.accounts || [];
+    S.coa = config.coa || [];
+  }
+  S.coaBy = new Map(S.coa.map(c => [c.code, c]));
+  S.periodsMeta = (periods && periods.periods) || {};
+  S.rules = rules.map(r => Object.assign({id:r._id}, r));
+  S.imports = imports.map(r => Object.assign({id:r._id}, r)).sort((a,b) => (b.at||"").localeCompare(a.at||""));
+
+  const chunks = await store.listCollection("txns");
+  S.chunks = new Map(chunks.map(c => [c.period || c._id, c.rows || []]));
+  const ov = await store.listCollection("overrides");
+  S.overrides = new Map(ov.map(o => [o._id, o]));
+
+  document.getElementById("storeState").textContent = "Shared database";
+}
+
+/** Every transaction, with any allocation override applied. */
+function allTxns(){
+  const out = [];
+  S.chunks.forEach((rows, period) => {
+    for(const r of rows){
+      const o = S.overrides.get(r.i);
+      out.push({
+        i:r.i, a:r.a, d:r.d, p:period, n:r.n, m:r.m, src:r.src || "",
+        c: o ? (o.c || null) : (r.c || null),
+        l: o ? (o.l ?? r.l ?? "") : (r.l || ""),
+        by: o ? (o.by || "manual") : (r.c ? "import" : "none"),
+        conf: o ? 1 : (r.conf ?? (r.c ? 1 : 0)),
+      });
+    }
+  });
+  return out;
+}
+const accountName = code => (S.accounts.find(a => a.code === code) || {}).name || code;
+
+/* ════════════════════════════════════════════════════════════════════════
+   The burn rate calculation
+   ════════════════════════════════════════════════════════════════════════ */
+const SECTIONS = {
+  revenue:      {title:"Revenue - Value Add Services & Financial Services", sign:1},
+  cos:          {title:"Cost of Sale", sign:-1},
+  other_income: {title:"Other Income", sign:1},
+  expense:      {title:"EXPENDITURE", sign:-1},
+  funding:      {title:"Investment from investor", sign:1},
+  transfer:     {title:"Transfers", sign:1},
+};
+const SECTION_ORDER = ["revenue","cos","other_income","expense","funding","transfer"];
+
+function buildReport(){
+  const txns = allTxns();
+  const periods = [...new Set(txns.map(t => t.p).concat(
+    Object.keys(S.periodsMeta).map(k => k.split("|")[1])))].filter(Boolean).sort();
+  const accounts = S.accounts.slice().sort((a,b) => (a.sort||0) - (b.sort||0));
+
+  const byCode = new Map(), byAcc = new Map();
+  for(const t of txns){
+    const ck = (t.c || "") + "|" + t.p;
+    const c = byCode.get(ck) || {sum:0, n:0};
+    c.sum += t.m; c.n++; byCode.set(ck, c);
+    const ak = t.a + "|" + t.p;
+    const a = byAcc.get(ak) || {sum:0, n:0};
+    a.sum += t.m; a.n++; byAcc.set(ak, a);
+  }
+  const codeSum = (code, p) => (byCode.get(code + "|" + p) || {sum:0}).sum;
+  const codeN   = (code, p) => (byCode.get(code + "|" + p) || {n:0}).n;
+
+  // Cash chain per account, over every known period so a filtered view still
+  // carries the right opening balance forward.
+  const opening = new Map(), closing = new Map();
+  for(const acc of accounts){
+    let prev = null;
+    for(const p of periods){
+      const meta = S.periodsMeta[acc.code + "|" + p];
+      let o = meta && meta.o !== null && meta.o !== undefined ? meta.o : null;
+      if(o === null){
+        const pm = prev ? S.periodsMeta[acc.code + "|" + prev] : null;
+        o = (pm && pm.s !== null && pm.s !== undefined) ? pm.s
+          : (prev !== null ? (closing.get(acc.code + "|" + prev) ?? 0) : 0);
+      }
+      const mv = (byAcc.get(acc.code + "|" + p) || {sum:0}).sum;
+      opening.set(acc.code + "|" + p, o);
+      closing.set(acc.code + "|" + p, o + mv);
+      prev = p;
+    }
+  }
+
+  const sections = {};
+  for(const key of SECTION_ORDER){
+    const meta = SECTIONS[key];
+    const lines = S.coa.filter(c => c.section === key)
+      .sort((a,b) => (a.sort||0) - (b.sort||0))
+      .map(c => {
+        const values = {}, counts = {};
+        for(const p of periods){ values[p] = r2(codeSum(c.code, p) * meta.sign); counts[p] = codeN(c.code, p); }
+        return {code:c.code, name:c.name, values, counts};
+      });
+    const total = {};
+    for(const p of periods) total[p] = r2(lines.reduce((s,l) => s + l.values[p], 0));
+    sections[key] = {key, title:meta.title, lines, total};
+  }
+
+  // Unallocated is reported, never dropped, or the difference row would lie.
+  // Zero-value statement notes are counted apart from what moves cash.
+  const unalloc = {values:{}, counts:{}, material:{}};
+  for(const p of periods){
+    let sum = 0, n = 0, mat = 0;
+    for(const t of txns){
+      if(t.p !== p) continue;
+      if(t.c && S.coaBy.has(t.c)) continue;
+      sum += t.m; n++;
+      if(Math.abs(t.m) >= 0.005) mat++;
+    }
+    unalloc.values[p] = r2(sum); unalloc.counts[p] = n; unalloc.material[p] = mat;
+  }
+
+  const totals = {};
+  for(const p of periods){
+    const revenue = sections.revenue.total[p];
+    const cos = sections.cos.total[p];
+    const otherIncome = sections.other_income.total[p];
+    const expenditure = sections.expense.total[p];
+    const funding = sections.funding.total[p];
+    const transfers = sections.transfer.total[p];
+    const un = unalloc.values[p];
+
+    const income = r2(revenue + otherIncome);
+    const grossMargin = r2(revenue - cos);
+    const surplus = r2(revenue + otherIncome - cos - expenditure);
+    const bs = r2(funding + transfers);
+    const grossBurn = r2(cos + expenditure);
+    const netBurn = r2(grossBurn - income);
+
+    const openTotal = r2(accounts.reduce((s,a) => s + (opening.get(a.code + "|" + p) ?? 0), 0));
+    const closeTotal = r2(openTotal + surplus + bs + un);
+
+    const stmts = accounts.map(a => {
+      const m = S.periodsMeta[a.code + "|" + p];
+      return m && m.s !== null && m.s !== undefined ? m.s : null;
+    });
+    const known = stmts.filter(v => v !== null);
+    const stmtTotal = known.length ? r2(known.reduce((s,v) => s+v, 0)) : null;
+    const missing = accounts.filter((a,i) => stmts[i] === null &&
+      (byAcc.has(a.code + "|" + p) || S.periodsMeta[a.code + "|" + p])).map(a => a.name);
+    const difference = stmtTotal === null ? null : r2(closeTotal - stmtTotal);
+    const status = stmtTotal === null ? "in_progress"
+      : (Math.abs(difference) < 0.01 && !missing.length) ? "reconciled" : "unreconciled";
+
+    totals[p] = {revenue, cos, otherIncome, expenditure, funding, transfers, unallocated:un,
+      income, grossMargin, surplus, bsMovements:bs, grossBurn, netBurn,
+      openingCash:openTotal, closingCash:closeTotal, statementClosing:stmtTotal,
+      difference, missing, status, netCashFlow:r2(surplus + bs + un)};
+  }
+
+  for(const key of ["cos","expense"]){
+    for(const line of sections[key].lines){
+      line.pct = {};
+      for(const p of periods) line.pct[p] = totals[p].grossBurn ? line.values[p] / totals[p].grossBurn : 0;
+    }
+    sections[key].pct = {};
+    for(const p of periods) sections[key].pct[p] = totals[p].grossBurn ? sections[key].total[p] / totals[p].grossBurn : 0;
+  }
+
+  const cash = accounts.map(a => {
+    const o = {}, mv = {}, cl = {}, st = {}, df = {};
+    for(const p of periods){
+      o[p] = r2(opening.get(a.code + "|" + p) ?? 0);
+      mv[p] = r2((byAcc.get(a.code + "|" + p) || {sum:0}).sum);
+      cl[p] = r2(closing.get(a.code + "|" + p) ?? 0);
+      const m = S.periodsMeta[a.code + "|" + p];
+      st[p] = m && m.s !== null && m.s !== undefined ? m.s : null;
+      df[p] = st[p] === null ? null : r2(cl[p] - st[p]);
+    }
+    return {code:a.code, name:a.name, number:a.number, kind:a.kind,
+            opening:o, movement:mv, closing:cl, statement:st, difference:df};
+  });
+
+  // Headline figures use reported months only: a part-imported month would
+  // otherwise drag the average burn down and overstate the runway.
+  const reported = periods.filter(p => totals[p].status !== "in_progress");
+  const focusPeriod = reported[reported.length-1] || periods[periods.length-1] || null;
+  const window3 = reported.slice(-3);
+  const mean = k => window3.length ? r2(window3.reduce((s,p) => s + totals[p][k], 0) / window3.length) : 0;
+  const avgNetBurn = mean("netBurn");
+  const cashOnHand = focusPeriod ? totals[focusPeriod].closingCash : 0;
+
+  // Months between the first and last with nothing imported at all.
+  const gaps = [];
+  const idx = p => { const [y,m] = p.split("-").map(Number); return y*12 + (m-1); };
+  for(let i = 1; i < periods.length; i++)
+    for(let k = idx(periods[i-1])+1; k < idx(periods[i]); k++)
+      gaps.push(Math.floor(k/12) + "-" + String((k%12)+1).padStart(2,"0") + "-01");
+
+  return {periods, accounts, sections, unallocated:unalloc, totals, cash, gaps, focusPeriod,
+    metrics:{window:window3, inProgress:periods.filter(p => totals[p].status === "in_progress"),
+             avgNetBurn, avgGrossBurn:mean("grossBurn"), cashOnHand,
+             runway: avgNetBurn > 0 ? r2(cashOnHand / avgNetBurn) : null}};
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Charts — marks in the validated hues, direct labels so identity never
+   rests on colour alone, one rand scale per chart.
+   ════════════════════════════════════════════════════════════════════════ */
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, ...kids){
+  const n = document.createElementNS(SVGNS, tag);
+  for(const k in (attrs||{})) if(attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+  for(const c of kids.flat(Infinity)) if(c !== null && c !== undefined && c !== false)
+    n.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return n;
+}
+function niceCeil(v){
+  if(v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  return Math.ceil(v / mag * 2) / 2 * mag;
+}
+function compact(n){
+  const a = Math.abs(n);
+  if(a >= 1e6) return (n/1e6).toFixed(a >= 1e7 ? 0 : 1) + "m";
+  if(a >= 1e3) return (n/1e3).toFixed(0) + "k";
+  return n.toFixed(0);
+}
+function tipNode(){
+  let t = document.getElementById("chartTip");
+  if(!t){
+    t = el("div", {id:"chartTip", role:"tooltip"});
+    t.style.cssText = "position:fixed;z-index:200;pointer-events:none;display:none;background:var(--surface);" +
+      "border:1px solid var(--rule-firm);border-radius:5px;padding:7px 10px;font-size:12px;" +
+      "box-shadow:var(--shadow);white-space:nowrap;color:var(--ink)";
+    document.body.append(t);
+  }
+  return t;
+}
+function hover(node, html){
+  const place = ev => {
+    const t = tipNode();
+    t.style.left = Math.min(ev.clientX + 12, innerWidth - t.offsetWidth - 12) + "px";
+    t.style.top = (ev.clientY - 40) + "px";
+  };
+  node.addEventListener("pointerenter", ev => { const t = tipNode(); t.innerHTML = html; t.style.display = "block"; place(ev); });
+  node.addEventListener("pointermove", place);
+  node.addEventListener("pointerleave", () => { tipNode().style.display = "none"; });
+}
+
+function chartIncomeBurn(periods, totals){
+  const W = 700, H = 250, L = 52, R = 14, T = 14, B = 42;
+  const iw = W-L-R, ih = H-T-B;
+  if(!periods.length) return el("div", {class:"hollow"}, "Nothing to chart yet.");
+  const max = niceCeil(Math.max(1, ...periods.flatMap(p => [totals[p].income, totals[p].grossBurn])));
+  const y = v => T + ih - (v/max)*ih;
+  const band = iw / periods.length;
+  const bw = Math.min(34, (band - 16)/2 - 1);
+  const svg = sv("svg", {class:"chart", viewBox:"0 0 "+W+" "+H, role:"img",
+    "aria-label":"Income against gross burn, by month, in rands"});
+  for(let i = 0; i <= 4; i++){
+    const v = max/4*i;
+    svg.append(sv("line", {class:"grid", x1:L, x2:W-R, y1:y(v), y2:y(v), "stroke-width":1, opacity:i?0.5:1}),
+               sv("text", {class:"ax", x:L-7, y:y(v)+3.5, "text-anchor":"end"}, compact(v)));
+  }
+  periods.forEach((p,i) => {
+    const t = totals[p], cx = L + band*i + band/2;
+    [{v:t.income, fill:"var(--mark-1)", nm:"Income", dx:-bw-1},
+     {v:t.grossBurn, fill:"var(--mark-2)", nm:"Gross burn", dx:1}].forEach(b => {
+      const h = Math.max(1, (Math.max(0,b.v)/max)*ih);
+      const rect = sv("rect", {x:cx+b.dx, y:T+ih-h, width:bw, height:h, rx:4, ry:4, fill:b.fill});
+      hover(rect, "<b>"+moLabel(p)+"</b><br>"+b.nm+": R "+fmt(b.v,false));
+      svg.append(rect);
+    });
+    svg.append(sv("text", {class:"ax", x:cx, y:H-24, "text-anchor":"middle"}, moLabel(p)));
+    const nb = t.netBurn;
+    svg.append(sv("text", {class:"dl", x:cx, y:H-10, "text-anchor":"middle",
+      fill: nb > 0 ? "var(--crit)" : "var(--good)"}, (nb > 0 ? "−" : "+") + compact(Math.abs(nb))));
+  });
+  return el("div", {},
+    svg,
+    el("div", {class:"legend"},
+      el("span", {}, el("i", {style:"background:var(--mark-1)"}), "Income"),
+      el("span", {}, el("i", {style:"background:var(--mark-2)"}), "Gross burn"),
+      el("span", {class:"dim"}, "Figure under each month is net cash burn")));
+}
+
+function chartCash(periods, totals){
+  const W = 700, H = 210, L = 52, R = 40, T = 16, B = 32;
+  const iw = W-L-R, ih = H-T-B;
+  if(periods.length < 2) return el("div", {class:"hollow"}, "Two months are needed for a trend.");
+  const vals = periods.map(p => totals[p].closingCash);
+  const lo = Math.min(0, ...vals), hi = niceCeil(Math.max(1, ...vals));
+  const y = v => T + ih - ((v-lo)/(hi-lo))*ih;
+  const x = i => L + iw*i/(periods.length-1);
+  const svg = sv("svg", {class:"chart", viewBox:"0 0 "+W+" "+H, role:"img",
+    "aria-label":"Closing cash balance by month, in rands"});
+  for(let i = 0; i <= 4; i++){
+    const v = lo + (hi-lo)/4*i;
+    svg.append(sv("line", {class:"grid", x1:L, x2:W-R, y1:y(v), y2:y(v), "stroke-width":1, opacity:i?0.5:1}),
+               sv("text", {class:"ax", x:L-7, y:y(v)+3.5, "text-anchor":"end"}, compact(v)));
+  }
+  svg.append(sv("polyline", {fill:"none", stroke:"var(--mark-3)", "stroke-width":2,
+    "stroke-linejoin":"round", "stroke-linecap":"round",
+    points: periods.map((p,i) => x(i)+","+y(totals[p].closingCash)).join(" ")}));
+  periods.forEach((p,i) => {
+    const v = totals[p].closingCash;
+    const anchor = i === 0 ? "start" : i === periods.length-1 ? "end" : "middle";
+    const dot = sv("circle", {cx:x(i), cy:y(v), r:4, fill:"var(--mark-3)", stroke:"var(--surface)", "stroke-width":2});
+    hover(dot, "<b>"+moLabel(p)+"</b><br>Closing cash: R "+fmt(v,false));
+    svg.append(dot,
+      sv("text", {class:"ax", x:x(i), y:H-11, "text-anchor":anchor}, moLabel(p)),
+      sv("text", {class:"dl", x:x(i), y:y(v)-10, "text-anchor":anchor}, compact(v)));
+  });
+  return svg;
+}
+
+function burnComposition(rep, period){
+  const lines = rep.sections.cos.lines.concat(rep.sections.expense.lines)
+    .map(l => ({name:l.name, code:l.code, v:l.values[period], p:(l.pct && l.pct[period]) || 0}))
+    .filter(l => l.v > 0).sort((a,b) => b.v - a.v).slice(0, 9);
+  if(!lines.length) return el("div", {class:"hollow"}, "No spend recorded in this month.");
+  const max = Math.max(...lines.map(l => l.v));
+  return el("div", {class:"compo"}, lines.map(l => el("div", {class:"row"},
+    el("span", {class:"code"}, l.code),
+    el("div", {},
+      el("div", {class:"nm", title:l.name}, l.name),
+      el("div", {class:"track", style:"margin-top:4px"}, el("div", {class:"fill", style:"width:"+(l.v/max*100)+"%"}))),
+    el("span", {class:"num"}, F0.format(l.v)),
+    el("span", {class:"num dim"}, (l.p*100).toFixed(1)+"%"))));
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Views
+   ════════════════════════════════════════════════════════════════════════ */
+function setChrome(title, sub, tools){
+  document.getElementById("viewTitle").textContent = title;
+  document.getElementById("viewSub").textContent = sub;
+  const box = wipe(document.getElementById("toplineTools"));
+  if(tools) box.append(tools);
+}
+
+function renderDashboard(root){
+  const rep = buildReport();
+  if(!rep.periods.length){
+    setChrome("Burn Rate Analysis", "No transactions yet");
+    root.append(el("div", {class:"panel"}, el("div", {class:"hollow"},
+      el("p", {}, "No transactions have been imported."),
+      el("button", {class:"btn go", onclick:() => go("import")}, "Import a bank statement"))));
+    return;
+  }
+  if(!S.focus || rep.periods.indexOf(S.focus) < 0) S.focus = rep.focusPeriod;
+  const m = rep.metrics, t = rep.totals[S.focus], fl = moLabel(S.focus);
+
+  setChrome("Burn Rate Analysis",
+    S.entity + " · " + rep.accounts.length + " accounts · " + moLabel(rep.periods[0]) + " to " + moLabel(rep.periods[rep.periods.length-1]),
+    el("div", {class:"bar"},
+      el("label", {class:"field"}, "Headline month",
+        el("select", {onchange: ev => { S.focus = ev.target.value; go("dashboard"); }},
+          rep.periods.map(p => el("option", {value:p, selected:p === S.focus},
+            moLabel(p) + (rep.totals[p].status === "in_progress" ? " · in progress" : ""))))),
+      el("button", {class:"btn", onclick:() => exportReport(rep)}, "Export CSV")));
+
+  // Notices, most serious first.
+  const notes = [];
+  const out = rep.periods.filter(p => rep.totals[p].difference !== null && Math.abs(rep.totals[p].difference) >= 0.01);
+  if(out.length) notes.push(note("crit", "!", "Reconciliation difference. ",
+    out.map(p => moLabel(p) + " is out by " + rand(rep.totals[p].difference)).join("; ") +
+    ". The calculated closing balance does not agree to the bank statements."));
+  const nUn = rep.periods.reduce((s,p) => s + rep.unallocated.material[p], 0);
+  if(nUn){
+    const val = rep.periods.reduce((s,p) => s + rep.unallocated.values[p], 0);
+    notes.push(note("warn", "?", nUn + " transaction" + (nUn === 1 ? "" : "s") + " not yet allocated, " + rand(val) + " net. ",
+      "They are in the closing cash balance on their own line, but in no income or expense category.",
+      {label:"Review them", run:() => go("transactions", {status:"unallocated"})}));
+  }
+  const miss = rep.periods.filter(p => rep.totals[p].missing.length);
+  if(miss.length) notes.push(note("info", "i", "Closing balances outstanding. ",
+    miss.map(p => moLabel(p) + ": " + rep.totals[p].missing.join(", ")).join("; ") +
+    ". Capture them under Reconciliation so the month can be reconciled."));
+  if(m.inProgress.length) notes.push(note("info", "i",
+    m.inProgress.map(p => moLabel(p)).join(", ") + (m.inProgress.length === 1 ? " is" : " are") + " still in progress. ",
+    "No bank statement closing balance has been captured, so " + (m.inProgress.length === 1 ? "it is" : "they are") +
+    " excluded from the average burn and runway."));
+  if(rep.gaps.length) notes.push(note("warn", "!", "Missing month" + (rep.gaps.length === 1 ? "" : "s") + ". ",
+    "Nothing has been imported for " + rep.gaps.map(g => moLabel(g)).join(", ") +
+    ". Cash carried forward across the gap, so period-on-period movement will not agree."));
+  if(notes.length) root.append(el("div", {class:"notes"}, notes));
+
+  root.append(el("div", {class:"tiles"},
+    tile("Cash on hand", rand(t.closingCash), "Closing balance, " + fl, t.closingCash < 0 ? "neg" : "", true),
+    tile("Net cash burn", rand(t.netBurn), (t.netBurn > 0 ? "Consumed in " : "Generated in ") + fl, t.netBurn > 0 ? "neg" : "pos"),
+    tile("Gross burn", rand(t.grossBurn), "Cost of sale + expenditure"),
+    tile("Avg net burn", rand(m.avgNetBurn),
+      m.window.length ? "Mean of the last " + m.window.length + " reported month" + (m.window.length === 1 ? "" : "s") : "No reported months yet",
+      m.avgNetBurn > 0 ? "neg" : "pos"),
+    tile("Runway", m.runway === null ? "n/a" : m.runway.toFixed(1) + " months",
+      m.runway === null ? "Cash generative — no burn to project" : "Cash on hand ÷ average net burn",
+      m.runway !== null && m.runway < 6 ? "neg" : "")));
+
+  root.append(el("div", {class:"grid2"},
+    panel("Income against burn", "Both series in rands, one scale", chartIncomeBurn(rep.periods, rep.totals)),
+    panel("Closing cash balance", "Calculated closing cash by month", chartCash(rep.periods, rep.totals))));
+  root.append(panel("Largest burn categories — " + moLabel(S.focus, true), "Share of gross burn",
+    burnComposition(rep, S.focus)));
+  root.append(reportPanel(rep));
+}
+
+const tile = (k, v, s, cls, lead) => el("div", {class:"tile" + (lead ? " lead" : "")},
+  el("div", {class:"k"}, k), el("div", {class:"v " + (cls||"")}, v), el("div", {class:"s"}, s));
+
+const panel = (title, sub, ...body) => el("div", {class:"panel"},
+  el("div", {class:"head"}, el("h3", {}, title), sub ? el("span", {class:"sub"}, sub) : null),
+  el("div", {class:"pad"}, body));
+
+function note(kind, ico, strong, rest, action){
+  return el("div", {class:"note " + kind},
+    el("span", {class:"ico"}, ico),
+    el("div", {}, el("b", {}, strong), rest, action ? " " : null,
+      action ? el("a", {href:"#", onclick: ev => { ev.preventDefault(); action.run(); }}, action.label) : null,
+      action ? "." : null));
+}
+
+/* ── the Burn Rate report ────────────────────────────────────────────── */
+function reportPanel(rep){
+  const cols = rep.periods;
+  const table = el("table", {class:"report"});
+  const hr = el("tr", {}, el("th", {class:"c"}, "Acc"), el("th", {class:"l"}, ""));
+  for(const p of cols){
+    const st = rep.totals[p].status;
+    hr.append(el("th", {class:"m", title: st === "in_progress" ? "No statement closing balance captured yet" : ""},
+      el("span", {class:"mo"}, moLabel(p)),
+      st === "in_progress" ? "In progress" : st === "unreconciled" ? "Unreconciled" : "Actual"),
+      el("th", {class:"m"}, "% of Total Burn"));
+  }
+  table.append(el("thead", {}, hr));
+  const tb = el("tbody");
+  table.append(tb);
+
+  function line(o){
+    const tr = el("tr", {class:(o.cls||"") + (o.click ? " act" : "")});
+    if(o.click){
+      tr.addEventListener("click", o.click);
+      tr.tabIndex = 0;
+      tr.addEventListener("keydown", ev => { if(ev.key === "Enter") o.click(ev); });
+    }
+    tr.append(el("td", {class:"c code"}, o.code || ""), el("td", {class:"l"}, o.label));
+    for(const p of cols){
+      const v = o.values ? o.values[p] : null;
+      tr.append(el("td", {class:"num" + sgn(v)}, v === null || v === undefined ? "—" : fmt(v)),
+                el("td", {class:"pct"}, o.pct ? pct(o.pct[p]) : ""));
+    }
+    return tr;
+  }
+  const gap = () => el("tr", {class:"gap"}, el("td", {colspan: 2 + cols.length*2}));
+  const band = txt => el("tr", {class:"band"}, el("td", {colspan: 2 + cols.length*2}, el("span", {}, txt)));
+  const col = k => Object.fromEntries(cols.map(p => [p, rep.totals[p][k]]));
+  const drill = q => ev => { ev.preventDefault(); go("transactions", q); };
+
+  tb.append(line({label:"Opening Cash balance", values:col("openingCash"), cls:"rule"}));
+  for(const a of rep.cash) tb.append(line({label:a.name, values:a.opening, cls:"sub"}));
+  tb.append(gap());
+
+  tb.append(line({label:"INCOME", values:col("income"), cls:"key"}));
+  tb.append(band(rep.sections.revenue.title));
+  for(const l of rep.sections.revenue.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, click:drill({code:l.code})}));
+  tb.append(line({label:"Total revenue", values:rep.sections.revenue.total, cls:"rule"}));
+  tb.append(gap());
+
+  tb.append(band("Cost of Sale"));
+  for(const l of rep.sections.cos.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, pct:l.pct, click:drill({code:l.code})}));
+  tb.append(line({label:"Total cost of sale", values:rep.sections.cos.total, pct:rep.sections.cos.pct, cls:"rule"}));
+  tb.append(line({label:"Gross Margin", values:col("grossMargin"), cls:"key"}));
+  tb.append(gap());
+
+  tb.append(band("Other Income"));
+  for(const l of rep.sections.other_income.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, click:drill({code:l.code})}));
+  tb.append(line({label:"Total other income", values:rep.sections.other_income.total, cls:"rule"}));
+  tb.append(gap());
+
+  tb.append(line({label:"EXPENDITURE", values:col("expenditure"), pct:rep.sections.expense.pct, cls:"key"}));
+  for(const l of rep.sections.expense.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, pct:l.pct, click:drill({code:l.code})}));
+  tb.append(gap());
+  tb.append(line({label:"Surplus / Deficit", values:col("surplus"), cls:"key"}));
+  tb.append(gap());
+
+  tb.append(line({label:"Balance sheet movements", values:col("bsMovements"), cls:"rule"}));
+  tb.append(band("Investment from investor"));
+  for(const l of rep.sections.funding.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, click:drill({code:l.code})}));
+  tb.append(band("Transfers"));
+  for(const l of rep.sections.transfer.lines)
+    tb.append(line({code:l.code, label:l.name, values:l.values, click:drill({code:l.code})}));
+  tb.append(gap());
+
+  if(cols.some(p => rep.unallocated.material[p] || rep.unallocated.values[p])){
+    tb.append(line({label:"Not yet allocated", values:rep.unallocated.values, cls:"rule",
+      click:drill({status:"unallocated"})}));
+    tb.append(gap());
+  }
+
+  tb.append(line({label:"Closing Cash balance", values:col("closingCash"), cls:"key"}));
+  tb.append(line({label:"Closing per Bank Statements", values:col("statementClosing"), cls:"rule"}));
+  for(const a of rep.cash) tb.append(line({label:a.name, values:a.statement, cls:"sub"}));
+  const diff = col("difference");
+  const dr = line({label:"Difference", values:diff, cls:"rule"});
+  if(cols.some(p => diff[p] !== null && Math.abs(diff[p]) >= 0.01)) dr.style.color = "var(--crit)";
+  tb.append(dr, gap());
+
+  tb.append(band("Ratio"));
+  tb.append(line({label:"Gross Burn Analysis", values:col("grossBurn"), cls:"rule"}));
+  tb.append(line({label:"Net cash burn", values:col("netBurn")}));
+  tb.append(line({label:"Net cash flow", values:col("netCashFlow")}));
+
+  return el("div", {class:"panel"},
+    el("div", {class:"head"}, el("h3", {}, "Burn Rate"),
+      el("span", {class:"sub"}, "Select any line to review the transactions behind it")),
+    el("div", {class:"scroll"}, table));
+}
+
+/* ── transactions ────────────────────────────────────────────────────── */
+const PAGE = 80;
+function renderTransactions(root){
+  const f = S.filters;
+  let rows = allTxns();
+  if(f.account) rows = rows.filter(t => t.a === f.account);
+  if(f.period) rows = rows.filter(t => t.p === f.period);
+  if(f.code) rows = rows.filter(t => t.c === f.code);
+  if(f.status === "unallocated") rows = rows.filter(t => !t.c);
+  if(f.status === "review") rows = rows.filter(t => !t.c || (t.by === "auto" && t.conf < 0.9));
+  if(f.status === "auto") rows = rows.filter(t => t.by === "auto");
+  if(f.status === "manual") rows = rows.filter(t => t.by === "manual");
+  if(f.direction === "in") rows = rows.filter(t => t.m > 0);
+  if(f.direction === "out") rows = rows.filter(t => t.m < 0);
+  if(f.search){
+    const q = f.search.toLowerCase();
+    rows = rows.filter(t => (t.n + " " + t.l).toLowerCase().indexOf(q) >= 0);
+  }
+  const dir = f.dir === "asc" ? 1 : -1;
+  const key = {date:"d", amount:"m", description:"n", account:"a"}[f.sort] || "d";
+  rows.sort((a,b) => (a[key] > b[key] ? 1 : a[key] < b[key] ? -1 : 0) * dir);
+
+  const moneyIn = rows.reduce((s,t) => s + (t.m > 0 ? t.m : 0), 0);
+  const moneyOut = rows.reduce((s,t) => s + (t.m < 0 ? t.m : 0), 0);
+  const nUn = rows.filter(t => !t.c).length;
+
+  setChrome("Transactions",
+    "Change an allocation and every figure on the dashboard follows",
+    el("button", {class:"btn", onclick:() => autoCategoriseBox()}, "Auto-categorise unallocated"));
+
+  const set = (k, v) => { S.filters[k] = v || undefined; S.filters.offset = 0; S.picked.clear(); go("transactions"); };
+  const periods = [...new Set(allTxns().map(t => t.p))].sort();
+  root.append(el("div", {class:"panel"}, el("div", {class:"pad"}, el("div", {class:"bar"},
+    el("label", {class:"field"}, "Search", el("input", {type:"search", value:f.search || "", placeholder:"Narrative or note…",
+      style:"min-width:210px", onchange: ev => set("search", ev.target.value.trim())})),
+    pick("Account", [["", "All accounts"]].concat(S.accounts.map(a => [a.code, a.name])), f.account || "", v => set("account", v)),
+    pick("Month", [["", "All months"]].concat(periods.map(p => [p, moLabel(p)])), f.period || "", v => set("period", v)),
+    pick("Category", [["", "All categories"]].concat(S.coa.map(c => [c.code, c.code + " — " + c.name])), f.code || "", v => set("code", v)),
+    pick("Status", [["all","All"],["review","Needs review"],["unallocated","Unallocated"],["auto","Auto-allocated"],["manual","Manual"]],
+      f.status || "all", v => { S.filters.status = v; S.filters.offset = 0; S.picked.clear(); go("transactions"); }),
+    pick("Direction", [["","In and out"],["in","Money in"],["out","Money out"]], f.direction || "", v => set("direction", v)),
+    el("button", {class:"btn", onclick:() => { S.filters = {status:"all", offset:0, sort:"date", dir:"desc"}; S.picked.clear(); go("transactions"); }}, "Clear")))));
+
+  const box = el("div", {class:"panel"});
+  root.append(box);
+  box.append(el("div", {class:"head"},
+    el("h3", {}, rows.length.toLocaleString("en-ZA") + " transaction" + (rows.length === 1 ? "" : "s")),
+    el("span", {class:"sub"}, "In " + rand(moneyIn) + " · Out " + rand(Math.abs(moneyOut)) +
+      " · Net " + rand(moneyIn + moneyOut) + (nUn ? " · " + nUn + " unallocated" : "")),
+    el("div", {class:"grow"}), el("span", {id:"bulk"})));
+
+  if(!rows.length){ box.append(el("div", {class:"hollow"}, "No transactions match these filters.")); return; }
+
+  const page = rows.slice(f.offset, f.offset + PAGE);
+  const table = el("table", {class:"rows"});
+  const allOn = page.every(t => S.picked.has(t.i));
+  table.append(el("thead", {}, el("tr", {},
+    el("th", {class:"sel"}, el("input", {type:"checkbox", checked:allOn, "aria-label":"Select all on this page",
+      onchange: ev => { for(const t of page) ev.target.checked ? S.picked.add(t.i) : S.picked.delete(t.i); go("transactions"); }})),
+    sortTh("Date","date"), el("th", {}, "Account"), sortTh("Description","description"),
+    sortTh("Amount","amount"), el("th", {}, "Allocated to"), el("th", {}, "Source"), el("th", {}))));
+  const tb = el("tbody");
+  for(const t of page) tb.append(txnRow(t));
+  table.append(tb);
+  box.append(el("div", {class:"scroll"}, table));
+
+  const from = f.offset + 1, to = Math.min(f.offset + page.length, rows.length);
+  box.append(el("div", {class:"pad", style:"display:flex;gap:12px;align-items:center;border-top:1px solid var(--rule)"},
+    el("span", {class:"dim", style:"font-size:12.5px"}, "Showing " + from + "–" + to + " of " + rows.length.toLocaleString("en-ZA")),
+    el("div", {style:"margin-left:auto"}),
+    el("button", {class:"btn sm", disabled:f.offset === 0, onclick:() => { S.filters.offset = Math.max(0, f.offset - PAGE); go("transactions"); }}, "Previous"),
+    el("button", {class:"btn sm", disabled:to >= rows.length, onclick:() => { S.filters.offset = f.offset + PAGE; go("transactions"); }}, "Next")));
+  drawBulk();
+}
+
+function pick(label, options, value, onChange){
+  return el("label", {class:"field"}, label,
+    el("select", {onchange: ev => onChange(ev.target.value)},
+      options.map(o => el("option", {value:o[0], selected:String(o[0]) === String(value)}, o[1]))));
+}
+function sortTh(label, key){
+  const on = S.filters.sort === key;
+  return el("th", {style:"cursor:pointer", onclick:() => {
+    S.filters.dir = on && S.filters.dir === "desc" ? "asc" : "desc";
+    S.filters.sort = key; S.filters.offset = 0; go("transactions");
+  }}, label, on ? (S.filters.dir === "desc" ? " ↓" : " ↑") : "");
+}
+
+function txnRow(t){
+  const chipCls = !t.c ? "bad" : t.by === "auto" ? (t.conf < 0.9 ? "mid" : "on") : t.by === "manual" ? "ok" : "";
+  const chipTxt = !t.c ? "unallocated" : t.by === "auto" ? (t.conf < 0.9 ? "check" : "auto") : t.by;
+  const tr = el("tr", {class: S.picked.has(t.i) ? "picked" : ""});
+  tr.append(
+    el("td", {class:"sel"}, el("input", {type:"checkbox", checked:S.picked.has(t.i), "aria-label":"Select " + t.n,
+      onchange: ev => { ev.target.checked ? S.picked.add(t.i) : S.picked.delete(t.i);
+                        tr.classList.toggle("picked", ev.target.checked); drawBulk(); }})),
+    el("td", {class:"num"}, dayLabel(t.d)),
+    el("td", {class:"dim", style:"font-size:12.5px"}, accountName(t.a)),
+    el("td", {}, el("div", {class:"ellip", title:t.n}, t.n || "—"),
+      t.l ? el("div", {class:"dim", style:"font-size:11.5px"}, t.l) : null),
+    el("td", {class:"num" + sgn(t.m)}, fmt(t.m, false)),
+    el("td", {}, el("select", {style:"max-width:216px;font-size:12.5px", "aria-label":"Allocation for " + t.n,
+        onchange: async ev => {
+          try { await allocate(t.i, ev.target.value || null, undefined); toast(ev.target.value ? "Allocated to " + ev.target.value : "Allocation cleared", "good"); go("transactions"); }
+          catch(err){ toast(err.message, "bad"); }
+        }},
+        el("option", {value:"", selected:!t.c}, "— unallocated —"),
+        S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " " + c.name))),
+      el("span", {class:"chip " + chipCls, style:"margin-left:6px"}, chipTxt)),
+    el("td", {class:"dim", style:"font-size:11.5px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap",
+      title:t.src}, t.src || "—"),
+    el("td", {}, el("button", {class:"btn sm", onclick:() => txnDetail(t)}, "Detail")));
+  return tr;
+}
+
+function drawBulk(){
+  const bar = document.getElementById("bulk");
+  if(!bar) return;
+  wipe(bar);
+  if(!S.picked.size) return;
+  bar.append(
+    el("span", {class:"dim", style:"font-size:12.5px;margin-right:8px"}, S.picked.size + " selected"),
+    el("button", {class:"btn sm", onclick:() => bulkBox()}, "Allocate selected"), " ",
+    el("button", {class:"btn sm", onclick:() => { S.picked.clear(); go("transactions"); }}, "Clear"));
+}
+
+/* Writes one allocation override. Seeded rows keep their original values; the
+   override document is what this firm decided. */
+async function allocate(id, code, label){
+  const body = {c: code || null, l: label === undefined ? (S.overrides.get(id)?.l ?? "") : label,
+                by: "manual", at: new Date().toISOString()};
+  await store.setDoc("overrides/" + id, body);
+  S.overrides.set(id, body);
+}
+
+function bulkBox(){
+  let form;
+  modal({title:"Allocate " + S.picked.size + " transaction" + (S.picked.size === 1 ? "" : "s"),
+    render: () => (form = el("div", {class:"fgrid"},
+      el("label", {class:"field wide"}, "Category",
+        el("select", {name:"code"}, el("option", {value:""}, "— clear the allocation —"),
+          S.coa.map(c => el("option", {value:c.code}, c.code + " — " + c.name)))),
+      el("label", {class:"field wide"}, "Note (optional)",
+        el("input", {type:"text", name:"label", placeholder:"Leave blank to keep existing notes"})))),
+    actions:[{label:"Cancel"}, {label:"Allocate", kind:"go", run: async () => {
+      const v = formOf(form);
+      const ids = [...S.picked];
+      for(const id of ids) await allocate(id, v.code || null, v.label || undefined);
+      toast(ids.length + " transactions allocated", "good");
+      S.picked.clear();
+      go("transactions");
+    }}]});
+}
+
+function txnDetail(t){
+  const ctx = {rules:S.rules, hist:learnedIndex(allTxns())};
+  const s = suggest(t.n, t.a, ctx);
+  let form;
+  modal({title:"Transaction detail", render: () => (form = el("div", {style:"display:flex;flex-direction:column;gap:14px"},
+    el("div", {class:"fgrid"},
+      ro("Date", dayLabel(t.d)), ro("Account", accountName(t.a)),
+      ro("Amount", rand(t.m)), ro("Reporting month", moLabel(t.p)),
+      el("div", {class:"wide"}, ro("Narrative", t.n || "—")),
+      el("div", {class:"wide"}, ro("Source", t.src || "—"))),
+    s.code ? note("info", "★", "Suggested: " + s.code + " (" + Math.round(s.confidence*100) + "% confidence). ", s.why) : null,
+    el("div", {class:"fgrid"},
+      el("label", {class:"field wide"}, "Category",
+        el("select", {name:"code"}, el("option", {value:""}, "— unallocated —"),
+          S.coa.map(c => el("option", {value:c.code, selected:c.code === t.c}, c.code + " — " + c.name)))),
+      el("label", {class:"field wide"}, "Note", el("input", {type:"text", name:"label", value:t.l || ""})),
+      el("label", {class:"check wide"}, el("input", {type:"checkbox", name:"similar"}),
+        "Apply to every transaction with the same narrative on this account"),
+      el("label", {class:"check wide"}, el("input", {type:"checkbox", name:"rule"}),
+        "Remember this as a rule for future imports")))),
+    actions:[{label:"Cancel"}, {label:"Save", kind:"go", run: async () => {
+      const v = formOf(form);
+      await allocate(t.i, v.code || null, v.label);
+      let also = 0;
+      if(v.similar && v.code){
+        const key = normalise(t.n);
+        for(const o of allTxns()){
+          if(o.i === t.i || o.a !== t.a || o.c === v.code) continue;
+          if(normalise(o.n) === key){ await allocate(o.i, v.code, o.l || v.label); also++; }
+        }
+      }
+      if(v.rule && v.code){
+        const pattern = normalise(t.n).split(" ").slice(0,3).join(" ") || t.n;
+        if(!S.rules.some(r => r.pattern === pattern && r.code === v.code)) await saveRule({
+          pattern, match:"contains", account:t.a, code:v.code, label:v.label || "",
+          priority:50, origin:"learned", active:true});
+      }
+      toast(also ? "Saved — " + also + " similar transaction(s) also updated" : "Saved", "good");
+      go("transactions");
+    }}]});
+}
+const ro = (k, v) => el("label", {class:"field"}, k, el("div", {style:"padding:5px 0;font-size:13px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink)"}, v));
+
+function autoCategoriseBox(){
+  let form;
+  const periods = [...new Set(allTxns().map(t => t.p))].sort();
+  modal({title:"Auto-categorise", render: () => (form = el("div", {style:"display:flex;flex-direction:column;gap:13px"},
+    el("p", {style:"margin:0;color:var(--ink-2)"},
+      "Unallocated transactions are matched against your rules and against how the same narratives " +
+      "were allocated before. Anything below 60% confidence is left for you to review."),
+    el("div", {class:"fgrid"},
+      el("label", {class:"field"}, "Account", el("select", {name:"account"},
+        el("option", {value:""}, "All accounts"), S.accounts.map(a => el("option", {value:a.code}, a.name)))),
+      el("label", {class:"field"}, "Month", el("select", {name:"period"},
+        el("option", {value:""}, "All months"), periods.map(p => el("option", {value:p}, moLabel(p)))))))),
+    actions:[{label:"Cancel"}, {label:"Run", kind:"go", run: async () => {
+      const v = formOf(form);
+      const ctx = {rules:S.rules, hist:learnedIndex(allTxns())};
+      const targets = allTxns().filter(t => !t.c &&
+        (!v.account || t.a === v.account) && (!v.period || t.p === v.period));
+      let done = 0;
+      for(const t of targets){
+        const s = suggest(t.n, t.a, ctx);
+        if(s.code && s.confidence >= 0.6){ await allocate(t.i, s.code, t.l || s.label); done++; }
+      }
+      toast(done + " of " + targets.length + " transactions allocated", "good");
+      go("transactions");
+    }}]});
+}
+
+/* ── reconciliation ──────────────────────────────────────────────────── */
+function renderAccounts(root){
+  const rep = buildReport();
+  setChrome("Reconciliation",
+    "Each account from opening balance, through the month's movements, to its closing balance");
+  if(!rep.periods.length){ root.append(el("div",{class:"panel"}, el("div",{class:"hollow"}, "Import a statement to begin."))); return; }
+
+  const bad = [];
+  for(const a of rep.cash) for(const p of rep.periods)
+    if(a.difference[p] !== null && Math.abs(a.difference[p]) >= 0.01) bad.push({a,p});
+  root.append(bad.length
+    ? note("crit", "!", bad.length + " account-month" + (bad.length === 1 ? "" : "s") + " do not reconcile. ",
+        bad.slice(0,4).map(x => x.a.name + " " + moLabel(x.p) + " " + rand(x.a.difference[x.p])).join("; ") +
+        (bad.length > 4 ? " and " + (bad.length-4) + " more." : "."))
+    : note("ok", "✓", "All captured balances reconcile. ",
+        "Every account's calculated closing balance agrees to its bank statement."));
+
+  for(const p of rep.periods){
+    const t = rep.totals[p];
+    const table = el("table", {class:"rows"});
+    table.append(el("thead", {}, el("tr", {}, el("th", {}, "Account"),
+      el("th", {class:"num"}, "Opening balance"), el("th", {class:"num"}, "Movement"),
+      el("th", {class:"num"}, "Calculated closing"), el("th", {class:"num"}, "Per bank statement"),
+      el("th", {class:"num"}, "Difference"), el("th", {}))));
+    const tb = el("tbody");
+    for(const a of rep.cash){
+      if(!a.movement[p] && a.statement[p] === null && !a.opening[p]) continue;
+      const d = a.difference[p], ok = d !== null && Math.abs(d) < 0.01;
+      tb.append(el("tr", {},
+        el("td", {}, a.name, a.number ? el("div", {class:"dim", style:"font-size:11.5px"}, a.number) : null),
+        el("td", {class:"num" + sgn(a.opening[p])}, fmt(a.opening[p], false)),
+        el("td", {class:"num" + sgn(a.movement[p])}, fmt(a.movement[p], false)),
+        el("td", {class:"num" + sgn(a.closing[p])}, fmt(a.closing[p], false)),
+        el("td", {class:"num" + sgn(a.statement[p])}, a.statement[p] === null
+          ? el("span", {class:"chip bad"}, "not captured") : fmt(a.statement[p], false)),
+        el("td", {class:"num"}, d === null ? el("span", {class:"dim"}, "—")
+          : el("span", {class:"chip " + (ok ? "ok" : "bad")}, ok ? "✓ reconciled" : fmt(d, false))),
+        el("td", {}, el("button", {class:"btn sm", onclick:() => balanceBox(a, p)}, "Edit balances"))));
+    }
+    const ok = t.difference !== null && Math.abs(t.difference) < 0.01;
+    tb.append(el("tr", {style:"font-weight:600;background:var(--raised)"},
+      el("td", {}, "Total"),
+      el("td", {class:"num" + sgn(t.openingCash)}, fmt(t.openingCash, false)),
+      el("td", {class:"num" + sgn(t.netCashFlow)}, fmt(t.netCashFlow, false)),
+      el("td", {class:"num" + sgn(t.closingCash)}, fmt(t.closingCash, false)),
+      el("td", {class:"num" + sgn(t.statementClosing)}, fmt(t.statementClosing, false)),
+      el("td", {class:"num"}, t.difference === null ? "—"
+        : el("span", {class:"chip " + (ok ? "ok" : "bad")}, ok ? "✓ nil" : fmt(t.difference, false))),
+      el("td", {})));
+    table.append(tb);
+
+    const nUn = rep.unallocated.material[p];
+    root.append(el("div", {class:"panel"},
+      el("div", {class:"head"}, el("h3", {}, moLabel(p, true)),
+        el("span", {class:"sub"}, "Net cash flow " + rand(t.netCashFlow) +
+          (nUn ? " · includes " + rand(rep.unallocated.values[p]) + " across " + nUn + " unallocated transaction" + (nUn === 1 ? "" : "s") : ""))),
+      el("div", {class:"scroll"}, table)));
+  }
+}
+
+function balanceBox(acc, period){
+  let form;
+  modal({title:acc.name + " — " + moLabel(period, true),
+    render: () => (form = el("div", {style:"display:flex;flex-direction:column;gap:13px"},
+      el("p", {style:"margin:0;color:var(--ink-2)"},
+        "Leave the opening balance blank to carry forward the previous month's closing balance. " +
+        "The statement closing balance is what the reconciliation is checked against."),
+      el("div", {class:"fgrid"},
+        el("label", {class:"field"}, "Opening balance",
+          el("input", {type:"number", step:"0.01", name:"o", value: acc.opening[period] ?? "", placeholder:"Carry forward"})),
+        el("label", {class:"field"}, "Closing balance per bank statement",
+          el("input", {type:"number", step:"0.01", name:"s", value: acc.statement[period] ?? "", placeholder:"Not captured"}))),
+      note("info", "i", "", "Movement in this month is " + rand(acc.movement[period]) +
+        ", so the calculated closing balance is " + rand(acc.closing[period]) + "."))),
+    actions:[{label:"Cancel"}, {label:"Save", kind:"go", run: async () => {
+      const v = formOf(form);
+      const next = Object.assign({}, S.periodsMeta);
+      next[acc.code + "|" + period] = {o: v.o === "" ? null : Number(v.o), s: v.s === "" ? null : Number(v.s)};
+      await store.setDoc("meta/periods", {periods: next});
+      S.periodsMeta = next;
+      toast("Balances saved", "good");
+      go("accounts");
+    }}]});
+}
+
+/* ── import ──────────────────────────────────────────────────────────── */
+let preview = null, lastFile = null;
+const importOpts = {dayFirst:true, swapDayMonth:false};
+
+function renderImport(root){
+  setChrome("Import bank statements",
+    "Excel or CSV. One file may hold several accounts stacked one after another.");
+
+  const zone = el("div", {class:"drop", tabindex:"0", role:"button"},
+    el("b", {}, "Drop a statement here, or choose a file"),
+    el("span", {}, ".xlsx, .xls, .csv"));
+  const input = el("input", {type:"file", accept:".xlsx,.xls,.csv,.txt,.tsv", style:"display:none"});
+  const openPicker = () => input.click();
+  zone.addEventListener("click", openPicker);
+  zone.addEventListener("keydown", ev => { if(ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); openPicker(); } });
+  zone.addEventListener("dragover", ev => { ev.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", ev => { ev.preventDefault(); zone.classList.remove("over");
+    if(ev.dataTransfer.files[0]) takeFile(ev.dataTransfer.files[0]); });
+  input.addEventListener("change", () => { if(input.files[0]) takeFile(input.files[0]); });
+
+  root.append(el("div", {class:"panel"}, el("div", {class:"pad"}, zone, input,
+    el("div", {class:"bar", style:"margin-top:13px"},
+      el("label", {class:"check"}, el("input", {type:"checkbox", checked:importOpts.dayFirst,
+        onchange: ev => { importOpts.dayFirst = ev.target.checked; if(lastFile) takeFile(lastFile); }}),
+        "Ambiguous dates are day/month (03/08 = 3 August)"),
+      el("label", {class:"check"}, el("input", {type:"checkbox", checked:importOpts.swapDayMonth,
+        onchange: ev => { importOpts.swapDayMonth = ev.target.checked; if(lastFile) takeFile(lastFile); }}),
+        "Swap day and month (the file stored them the wrong way round)")))));
+
+  root.append(el("div", {id:"pv"}));
+  if(preview) drawPreview();
+  if(S.imports.length) root.append(importHistory());
+}
+
+async function takeFile(file){
+  lastFile = file;
+  const host = wipe(document.getElementById("pv"));
+  host.append(el("div", {class:"panel"}, el("div", {class:"hollow"}, el("span", {class:"spin"}), " Reading " + file.name + "…")));
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const parsed = parseStatement(buf, file.name, importOpts);
+    const blocks = [];
+    for(const sheet of parsed.sheets)
+      sheet.blocks.forEach((b, i) => blocks.push(Object.assign({id:sheet.name + "::" + i, sheet:sheet.name}, b)));
+    if(!blocks.length) throw new Error("No statement rows found. The file needs a header row with a date column and an amount (or debit and credit) column.");
+    preview = {filename:file.name, blocks};
+    drawPreview();
+  } catch(err){
+    wipe(document.getElementById("pv")).append(
+      note("crit", "!", "Could not read that file. ", err.message));
+  }
+}
+
+function matchAccount(hint){
+  if(hint.number){
+    const byNum = S.accounts.find(a => a.number && a.number === hint.number);
+    if(byNum) return byNum.code;
+  }
+  if(hint.name){
+    const want = new Set(normalise(hint.name).split(" ").filter(Boolean));
+    let best = null;
+    for(const a of S.accounts){
+      const have = normalise(a.name).split(" ").filter(Boolean);
+      if(!have.length) continue;
+      const hits = have.filter(t => want.has(t)).length;   // whole tokens only
+      const score = hits / have.length;
+      if(hits >= 2 && score >= 0.6 && (!best || score > best.score)) best = {code:a.code, score};
+    }
+    if(best) return best.code;
+  }
+  return "";
+}
+
+function drawPreview(){
+  const host = wipe(document.getElementById("pv"));
+  if(preview.blocks.some(b => b.dateSuspect) && !importOpts.swapDayMonth)
+    host.append(note("warn", "!", "Check the dates. ",
+      "Rows in this file span more than two months, which usually means day and month are the wrong way round. " +
+      "Tick “Swap day and month” above and the preview reloads."));
+
+  for(const b of preview.blocks){
+    const sel = el("select", {}, el("option", {value:""}, "— do not import —"),
+      S.accounts.map(a => el("option", {value:a.code, selected:a.code === matchAccount(b.hint)}, a.name)));
+    b._sel = sel;
+    const sample = el("table", {class:"rows"});
+    sample.append(el("thead", {}, el("tr", {}, el("th", {}, "Date"), el("th", {}, "Description"),
+      el("th", {class:"num"}, "Amount"), el("th", {class:"num"}, "Balance"), el("th", {}, "Code in file"))));
+    const tb = el("tbody");
+    for(const r of b.rows.slice(0,6)) tb.append(el("tr", {},
+      el("td", {class:"num"}, dayLabel(r.date)),
+      el("td", {}, el("div", {class:"ellip"}, r.description)),
+      el("td", {class:"num" + sgn(r.amount)}, fmt(r.amount, false)),
+      el("td", {class:"num dim"}, r.balance === null ? "—" : fmt(r.balance, false)),
+      el("td", {class:"code"}, r.code || "—")));
+    sample.append(tb);
+
+    const movement = b.rows.reduce((s,r) => s + r.amount, 0);
+    const consistent = b.opening !== null && b.closing !== null
+      ? Math.abs(r2(b.opening + movement - b.closing)) < 0.01 : null;
+
+    host.append(el("div", {class:"panel"},
+      el("div", {class:"head"},
+        el("h3", {}, b.hint.name || b.sheet),
+        el("span", {class:"sub"}, b.rows.length + " rows · " +
+          (b.months.map(m => moLabel(m)).join(", ") || "no month") +
+          " · columns: " + Object.keys(b.cols).join(", ") + (b.descending ? " · newest first" : "")),
+        el("div", {class:"grow"}),
+        el("label", {class:"field"}, "Import into", sel)),
+      el("div", {class:"pad"},
+        el("div", {class:"bar", style:"gap:26px;margin-bottom:13px"},
+          stat("Account number in file", b.hint.number || "—"),
+          stat("Opening balance", b.opening === null ? "not found" : rand(b.opening)),
+          stat("Closing balance", b.closing === null ? "not found" : rand(b.closing)),
+          stat("Net movement", rand(r2(movement)))),
+        consistent === null
+          ? note("info", "i", "", "No opening or closing balance was found in this block. You can capture them under Reconciliation after importing.")
+          : consistent
+            ? note("ok", "✓", "", "Opening balance plus the movements in this block equals the closing balance — the file is internally consistent.")
+            : note("warn", "!", "Out by " + rand(r2(b.opening + movement - b.closing)) + ". ",
+                "Opening plus movements does not equal the closing balance in this file, so rows may be missing from it."),
+        el("h4", {style:"margin:15px 0 7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)"},
+          "First " + Math.min(6, b.rows.length) + " rows"),
+        el("div", {class:"scroll"}, sample))));
+  }
+
+  host.append(el("div", {class:"panel"}, el("div", {class:"pad", style:"display:flex;gap:10px;align-items:center"},
+    el("span", {class:"dim", style:"font-size:13px"},
+      preview.blocks.reduce((s,b) => s + b.rows.length, 0) + " rows ready from " + preview.filename),
+    el("div", {style:"margin-left:auto"}),
+    el("button", {class:"btn", onclick:() => { preview = null; lastFile = null; go("import"); }}, "Cancel"),
+    el("button", {class:"btn go", onclick: ev => commitImport(ev.currentTarget)}, "Import"))));
+}
+const stat = (k, v) => el("div", {},
+  el("div", {style:"font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-weight:600"}, k),
+  el("div", {style:"font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px"}, v));
+
+async function commitImport(button){
+  const chosen = preview.blocks.filter(b => b._sel.value);
+  if(!chosen.length){ toast("Choose an account for at least one block", "bad"); return; }
+  button.disabled = true; button.textContent = "Importing…";
+  try {
+    // Identity is (account, date, narrative, amount, nth occurrence): importing
+    // the same file twice adds nothing, while two genuinely separate payments
+    // of the same amount on one day are both kept.
+    const seen = new Map();
+    for(const t of allTxns()){
+      const k = t.a + "|" + t.d + "|" + t.n.toLowerCase().trim() + "|" + t.m.toFixed(2);
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+    const ctx = {rules:S.rules, hist:learnedIndex(allTxns())};
+    const known = new Set(S.coa.map(c => c.code));
+    const additions = new Map();
+    const balances = Object.assign({}, S.periodsMeta);
+    let added = 0, skipped = 0, auto = 0;
+    const stamp = Date.now().toString(36);
+    let n = 0;
+
+    for(const b of chosen){
+      const acc = b._sel.value;
+      for(const r of b.rows){
+        const key = acc + "|" + r.date + "|" + r.description.toLowerCase().trim() + "|" + r.amount.toFixed(2);
+        const left = seen.get(key) || 0;
+        if(left > 0){ seen.set(key, left - 1); skipped++; continue; }
+        let code = r.code && known.has(r.code) ? r.code : null;
+        let label = r.label || "", conf = code ? 1 : 0, by = code ? "import" : "none";
+        if(!code){
+          const s = suggest(r.description, acc, ctx);
+          if(s.code && s.confidence >= 0.6){ code = s.code; conf = s.confidence; by = "auto"; if(!label) label = s.label; auto++; }
+        }
+        const row = {i:"u" + stamp + (n++), a:acc, d:r.date, n:r.description, m:r.amount,
+                     c:code, l:label, conf, by, src:preview.filename};
+        if(!additions.has(r.period)) additions.set(r.period, []);
+        additions.get(r.period).push(row);
+        added++;
+      }
+      // The statement's own balances belong to its earliest and latest months.
+      if(b.rows.length){
+        const months = b.rows.map(r => r.period).sort();
+        const first = months[0], last = months[months.length-1];
+        if(b.opening !== null && b.opening !== undefined){
+          const cur = balances[acc + "|" + first] || {o:null, s:null};
+          if(cur.o === null || cur.o === undefined) balances[acc + "|" + first] = {o:b.opening, s:cur.s ?? null};
+        }
+        if(b.closing !== null && b.closing !== undefined){
+          const cur = balances[acc + "|" + last] || {o:null, s:null};
+          balances[acc + "|" + last] = {o:cur.o ?? null, s:b.closing};
+        }
+      }
+    }
+
+    if(!added){
+      toast("Every row in this file is already in the database — nothing was added.", "bad");
+      button.disabled = false; button.textContent = "Import";
+      return;
+    }
+    for(const [period, rows] of additions){
+      const existing = S.chunks.get(period) || [];
+      const merged = existing.concat(rows.map(r => ({i:r.i, a:r.a, d:r.d, n:r.n, m:r.m, c:r.c, l:r.l, conf:r.conf, src:r.src})));
+      await store.setDoc("txns/" + period, {period, rows:merged});
+      S.chunks.set(period, merged);
+    }
+    await store.setDoc("meta/periods", {periods:balances});
+    S.periodsMeta = balances;
+    const rec = {file:preview.filename, at:new Date().toISOString(), added, skipped, auto};
+    const id = "b" + stamp;
+    await store.setDoc("imports/" + id, rec);
+    S.imports.unshift(Object.assign({id}, rec));
+
+    toast(added + " imported, " + skipped + " already present, " + auto + " auto-allocated", "good");
+    preview = null; lastFile = null;
+    go("import");
+  } catch(err){
+    toast(err.message || String(err), "bad");
+    button.disabled = false; button.textContent = "Import";
+  }
+}
+
+function importHistory(){
+  const table = el("table", {class:"rows"});
+  table.append(el("thead", {}, el("tr", {}, el("th", {}, "File"), el("th", {}, "Imported"),
+    el("th", {class:"num"}, "Rows"), el("th", {class:"num"}, "Already present"),
+    el("th", {class:"num"}, "Auto-allocated"))));
+  const tb = el("tbody");
+  for(const b of S.imports) tb.append(el("tr", {},
+    el("td", {}, b.file),
+    el("td", {class:"dim", style:"font-size:12.5px"}, new Date(b.at).toLocaleString("en-ZA")),
+    el("td", {class:"num"}, b.added),
+    el("td", {class:"num dim"}, b.skipped || "—"),
+    el("td", {class:"num"}, b.auto || "—")));
+  table.append(tb);
+  return el("div", {class:"panel"},
+    el("div", {class:"head"}, el("h3", {}, "Import history")),
+    el("div", {class:"scroll"}, table));
+}
+
+/* ── rules ───────────────────────────────────────────────────────────── */
+async function saveRule(rule){
+  const id = rule.id || ("r" + Date.now().toString(36));
+  const body = {pattern:rule.pattern, match:rule.match, account:rule.account || null, code:rule.code,
+                label:rule.label || "", priority:rule.priority ?? 100, origin:rule.origin || "manual",
+                active: rule.active !== false};
+  await store.setDoc("rules/" + id, body);
+  const i = S.rules.findIndex(r => r.id === id);
+  const next = Object.assign({id}, body);
+  if(i >= 0) S.rules[i] = next; else S.rules.push(next);
+  S.rules.sort((a,b) => (a.priority||100) - (b.priority||100));
+}
+
+function renderRules(root){
+  setChrome("Categorisation rules",
+    "Rules run before anything else on import; otherwise the app falls back on previous allocations",
+    el("button", {class:"btn go", onclick:() => ruleBox(null)}, "New rule"));
+
+  if(!S.rules.length){
+    root.append(el("div", {class:"panel"}, el("div", {class:"hollow"},
+      el("p", {}, "No rules yet."),
+      el("p", {style:"font-size:13px;max-width:56ch;margin:0 auto"},
+        "Transactions are still categorised automatically from previous allocations. Add a rule when you " +
+        "want a narrative pinned to a category for good — or tick “Remember this as a rule” when allocating one."))));
+    return;
+  }
+  const verb = {contains:"contains", exact:"is exactly", starts:"starts with", regex:"matches regex"};
+  const table = el("table", {class:"rows"});
+  table.append(el("thead", {}, el("tr", {}, el("th", {class:"num"}, "Priority"),
+    el("th", {}, "When the narrative"), el("th", {}, "Pattern"), el("th", {}, "Account"),
+    el("th", {}, "Allocate to"), el("th", {}, "Origin"), el("th", {}))));
+  const tb = el("tbody");
+  for(const r of S.rules){
+    const c = S.coaBy.get(r.code);
+    tb.append(el("tr", {style: r.active ? "" : "opacity:.5"},
+      el("td", {class:"num"}, r.priority ?? 100),
+      el("td", {class:"dim"}, verb[r.match] || r.match),
+      el("td", {}, el("code", {class:"code", style:"font-size:12px;color:var(--ink)"}, r.pattern)),
+      el("td", {class:"dim"}, r.account ? accountName(r.account) : "any account"),
+      el("td", {}, r.code + (c ? " — " + c.name : "")),
+      el("td", {}, el("span", {class:"chip " + (r.origin === "learned" ? "on" : "")}, r.origin)),
+      el("td", {}, el("button", {class:"btn sm", onclick:() => ruleBox(r)}, "Edit"), " ",
+        el("button", {class:"btn sm bad", onclick: async () => {
+          if(!await confirmBox("Delete rule", 'Delete the rule for "' + r.pattern + '"? Transactions already allocated by it keep their category.', "Delete")) return;
+          await store.del("rules/" + r.id);
+          S.rules = S.rules.filter(x => x.id !== r.id);
+          toast("Rule deleted", "good");
+          go("rules");
+        }}, "Delete"))));
+  }
+  table.append(tb);
+  root.append(el("div", {class:"panel"}, el("div", {class:"scroll"}, table)));
+}
+
+function ruleBox(rule){
+  let form;
+  modal({title: rule ? "Edit rule" : "New rule", render: () => (form = el("div", {class:"fgrid"},
+    el("label", {class:"field wide"}, "Pattern",
+      el("input", {type:"text", name:"pattern", value:rule?.pattern || "", placeholder:"kazang"})),
+    el("label", {class:"field"}, "Match", el("select", {name:"match"},
+      [["contains","contains"],["exact","is exactly"],["starts","starts with"],["regex","matches regex"]]
+        .map(o => el("option", {value:o[0], selected:rule?.match === o[0]}, o[1])))),
+    el("label", {class:"field"}, "Priority",
+      el("input", {type:"number", name:"priority", value:rule?.priority ?? 100})),
+    el("label", {class:"field wide"}, "Allocate to", el("select", {name:"code"},
+      S.coa.map(c => el("option", {value:c.code, selected:rule?.code === c.code}, c.code + " — " + c.name)))),
+    el("label", {class:"field wide"}, "Only for account", el("select", {name:"account"},
+      el("option", {value:""}, "Any account"),
+      S.accounts.map(a => el("option", {value:a.code, selected:rule?.account === a.code}, a.name)))),
+    el("label", {class:"field wide"}, "Note applied to matched transactions",
+      el("input", {type:"text", name:"label", value:rule?.label || "", placeholder:"Optional"})),
+    rule ? el("label", {class:"check wide"}, el("input", {type:"checkbox", name:"active", checked:rule.active !== false}), "Active") : null)),
+    actions:[{label:"Cancel"}, {label:"Save", kind:"go", run: async () => {
+      const v = formOf(form);
+      if(!v.pattern.trim()) throw new Error("A pattern is required.");
+      if(v.match === "regex"){ try { new RegExp(v.pattern); } catch { throw new Error("That is not a valid regular expression."); } }
+      await saveRule({id:rule?.id, pattern:v.pattern.trim(), match:v.match, account:v.account || null,
+        code:v.code, label:v.label, priority:Number(v.priority) || 100,
+        origin:rule?.origin || "manual", active: rule ? v.active : true});
+      toast("Rule saved", "good");
+      go("rules");
+    }}]});
+}
+
+/* ── export ──────────────────────────────────────────────────────────── */
+async function exportReport(rep){
+  const cols = rep.periods, rows = [];
+  rows.push(["Code","Line"].concat(cols.flatMap(p => [moLabel(p), "% of total burn"])));
+  const push = (code, label, values, pcts) => rows.push([code, label].concat(cols.flatMap(p => {
+    const v = values ? values[p] : null;
+    return [v === null || v === undefined ? "" : v.toFixed(2), pcts ? (pcts[p] ?? 0).toFixed(4) : ""];
+  })));
+  const col = k => Object.fromEntries(cols.map(p => [p, rep.totals[p][k]]));
+  push("", "Opening Cash balance", col("openingCash"));
+  for(const a of rep.cash) push("", "  " + a.name, a.opening);
+  push("", "INCOME", col("income"));
+  for(const l of rep.sections.revenue.lines) push(l.code, l.name, l.values);
+  push("", "Total revenue", rep.sections.revenue.total);
+  for(const l of rep.sections.cos.lines) push(l.code, l.name, l.values, l.pct);
+  push("", "Total cost of sale", rep.sections.cos.total, rep.sections.cos.pct);
+  push("", "Gross Margin", col("grossMargin"));
+  for(const l of rep.sections.other_income.lines) push(l.code, l.name, l.values);
+  push("", "Total other income", rep.sections.other_income.total);
+  push("", "EXPENDITURE", col("expenditure"), rep.sections.expense.pct);
+  for(const l of rep.sections.expense.lines) push(l.code, l.name, l.values, l.pct);
+  push("", "Surplus / Deficit", col("surplus"));
+  for(const l of rep.sections.funding.lines) push(l.code, l.name, l.values);
+  for(const l of rep.sections.transfer.lines) push(l.code, l.name, l.values);
+  push("", "Balance sheet movements", col("bsMovements"));
+  push("", "Not yet allocated", rep.unallocated.values);
+  push("", "Closing Cash balance", col("closingCash"));
+  push("", "Closing per Bank Statements", col("statementClosing"));
+  for(const a of rep.cash) push("", "  " + a.name, a.statement);
+  push("", "Difference", col("difference"));
+  push("", "Gross Burn Analysis", col("grossBurn"));
+  push("", "Net cash burn", col("netBurn"));
+
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c ?? "");
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(",")).join("\n");
+
+  const downloads = await claude.use("downloads");
+  if(!downloads){ toast("Downloads are not available in this view.", "bad"); return; }
+  try {
+    await downloads.save({filename: "burn-rate-" + cols[0] + "-to-" + cols[cols.length-1] + ".csv", data: csv});
+    toast("Report exported", "good");
+  } catch(err){
+    if(err && err.code === "cancelled") return;
+    toast("The export was not saved.", "bad");
+  }
+}
+
+/* ── router ──────────────────────────────────────────────────────────── */
+const VIEWS = {dashboard:renderDashboard, transactions:renderTransactions,
+               accounts:renderAccounts, import:renderImport, rules:renderRules};
+
+function go(view, params){
+  if(!VIEWS[view]) view = "dashboard";
+  if(params){ S.filters = Object.assign({status:"all", offset:0, sort:"date", dir:"desc"}, params); S.picked.clear(); }
+  S.view = view;
+  for(const b of document.querySelectorAll(".nav")){
+    if(b.dataset.v === view) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  }
+  const root = wipe(document.getElementById("view"));
+  try { VIEWS[view](root); }
+  catch(err){
+    root.append(note("crit", "!", "Something went wrong rendering this page. ", err.message));
+    console.error(err);
+  }
+  refreshTally();
+  scrollTo({top:0});
+}
+
+function refreshTally(){
+  const t = allTxns();
+  const n = t.filter(x => (!x.c && Math.abs(x.m) >= 0.005) || (x.by === "auto" && x.conf < 0.9)).length;
+  const pill = document.getElementById("tally");
+  pill.hidden = !n;
+  pill.textContent = n > 999 ? "999+" : n;
+  document.getElementById("storeCount").textContent = t.length
+    ? t.length.toLocaleString("en-ZA") + " transactions" : "";
+}
+
+document.getElementById("rail").addEventListener("click", ev => {
+  const b = ev.target.closest(".nav");
+  if(b) go(b.dataset.v);
+});
+
+(async () => {
+  try { await load(); }
+  catch(err){
+    console.error(err);
+    S.degraded = true;
+    document.getElementById("storeState").textContent = "Database error";
+  }
+  document.getElementById("entity").textContent = S.entity || "No entity loaded";
+  if(S.degraded && !S.chunks.size){
+    setChrome("Burn Rate Analysis", "The shared database could not be reached");
+    wipe(document.getElementById("view")).append(
+      note("crit", "!", "The shared transaction database is not available in this view. ",
+        "Reload the page, or open the artifact directly. Nothing has been lost — the data lives in the artifact's database, not in this browser."));
+    return;
+  }
+  go("dashboard");
+})();
+</script>
