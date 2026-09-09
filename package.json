@@ -8,7 +8,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "start": "node --no-warnings server/index.js",
+    "start": "node --no-warnings scripts/seed.js && node --no-warnings server/index.js",
     "seed": "node --no-warnings scripts/seed.js",
     "reset": "node --no-warnings scripts/seed.js --reset",
     "test": "node --no-warnings test/parse.test.js && node --no-warnings test/verify.js",
