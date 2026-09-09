@@ -1,0 +1,19 @@
+{
+  "name": "burn-rate-analysis",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web-based Burn Rate Analysis for bank statement import, transaction categorisation, cash-flow reporting and bank reconciliation.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "seed": "node --no-warnings scripts/seed.js",
+    "reset": "node --no-warnings scripts/seed.js --reset",
+    "test": "node --no-warnings test/parse.test.js && node --no-warnings test/verify.js"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

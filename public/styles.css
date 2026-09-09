@@ -1,0 +1,278 @@
+/* Burn Rate Analysis — chart colours come from the validated reference palette
+   (see the dataviz palette reference); surfaces match it so contrast holds. */
+:root {
+  color-scheme: light;
+  --plane:        #f9f9f7;
+  --surface:      #fcfcfb;
+  --surface-2:    #f2f1ee;
+  --surface-3:    #e9e8e4;
+  --border:       #dcdbd6;
+  --border-strong:#c2c1ba;
+  --text:         #0b0b0b;
+  --text-2:       #52514e;
+  --text-3:       #78766f;
+
+  --series-1: #2a78d6;   /* income  */
+  --series-2: #eb6834;   /* burn    */
+  --series-3: #1baf7a;   /* cash    */
+
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+
+  --accent:      #2a78d6;
+  --accent-soft: #e8f0fd;
+  --shadow: 0 1px 2px rgba(11, 11, 11, .06), 0 1px 8px rgba(11, 11, 11, .04);
+  --radius: 8px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plane: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --surface-3: #2d2d2b;
+    --border: #383835; --border-strong: #4d4d49;
+    --text: #ffffff; --text-2: #c3c2b7; --text-3: #93918a;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+    --accent: #3987e5; --accent-soft: #16283f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 8px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --surface-3: #2d2d2b;
+  --border: #383835; --border-strong: #4d4d49;
+  --text: #ffffff; --text-2: #c3c2b7; --text-3: #93918a;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --accent: #3987e5; --accent-soft: #16283f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 8px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--plane); color: var(--text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
+a { color: var(--accent); }
+
+/* ------------------------------------------------------------------ layout */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 20px; padding: 0 20px; height: 56px;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.brand strong { font-size: 15px; letter-spacing: -.02em; }
+.brand span { font-size: 12px; color: var(--text-3); }
+.tabs { display: flex; gap: 2px; margin-left: auto; flex-wrap: wrap; }
+.tab {
+  border: 0; background: none; color: var(--text-2); cursor: pointer;
+  padding: 7px 13px; border-radius: 6px; font: inherit; font-size: 13px; font-weight: 500;
+}
+.tab:hover { background: var(--surface-2); color: var(--text); }
+.tab[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.tab .pill {
+  display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 9px;
+  background: var(--critical); color: #fff; font-size: 11px; font-weight: 600; line-height: 17px;
+}
+main { padding: 20px; max-width: 1680px; margin: 0 auto; }
+.view { display: none; }
+.view.active { display: block; }
+
+.page-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.page-head h2 { font-size: 19px; }
+.page-head p { margin: 3px 0 0; color: var(--text-2); font-size: 13px; max-width: 70ch; }
+.page-head .spacer { margin-left: auto; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px;
+}
+.card > header {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.card > header h3 { font-size: 14px; }
+.card > header .sub { color: var(--text-3); font-size: 12px; }
+.card > header .spacer { margin-left: auto; }
+.card .body { padding: 16px; }
+.card .body.flush { padding: 0; }
+
+/* ------------------------------------------------------------------ inputs */
+button, select, input, textarea { font: inherit; color: inherit; }
+.btn {
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.danger { color: var(--critical); border-color: var(--critical); background: transparent; }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--critical) 10%, transparent); }
+.btn.sm { padding: 3px 8px; font-size: 12px; }
+select, input[type=text], input[type=search], input[type=number], input[type=date], textarea {
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: 6px 9px; font-size: 13px; max-width: 100%;
+}
+select:focus-visible, input:focus-visible, textarea:focus-visible, .btn:focus-visible, .tab:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); }
+.toolbar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------------ tables */
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+/* .table-wrap has overflow-x:auto, which makes it a scroll container on BOTH
+   axes, so the header sticks to the wrapper rather than the viewport. Offset 0
+   is therefore required — any other value pushes the header down over the
+   first rows instead of pinning it. */
+thead th {
+  position: sticky; top: 0; z-index: 5; background: var(--surface-2);
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-2); white-space: nowrap;
+}
+tbody tr:hover { background: var(--surface-2); }
+.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.muted { color: var(--text-3); }
+.neg { color: var(--critical); }
+.pos { color: var(--good); }
+
+/* Burn Rate report ------------------------------------------------------- */
+.report th, .report td { border-bottom: 0; padding: 5px 10px; }
+.report tbody tr:hover { background: var(--surface-2); }
+.report .code {
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-3); width: 62px;
+  position: sticky; left: 0; z-index: 2; background: inherit;
+}
+.report .label {
+  min-width: 300px; position: sticky; left: 62px; z-index: 2; background: inherit;
+  box-shadow: 1px 0 0 var(--border);
+}
+/* Rows inherit `background: inherit` above, so each row band needs a real
+   colour of its own or the pinned cells would be transparent. */
+.report tbody tr { background: var(--surface); }
+.report tbody tr:hover { background: var(--surface-2); }
+.report tr.total { background: var(--surface-2); }
+.report tr.grand { background: var(--surface-3); }
+.report tr.section-head { background: var(--surface); }
+.report tr.spacer { background: var(--surface); }
+.report thead th:first-child { position: sticky; left: 0; z-index: 6; }
+.report .pct { color: var(--text-3); font-size: 11.5px; width: 74px; }
+.report tr.section-head td {
+  padding-top: 16px; font-weight: 600; font-size: 13px;
+  border-bottom: 1px solid var(--border-strong);
+}
+/* The cell spans every column, so the text itself is what has to stay put. */
+.report tr.section-head td > span {
+  position: sticky; left: 10px; display: inline-block;
+}
+.report tr.total td {
+  font-weight: 600; border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.report tr.grand td {
+  font-weight: 700; font-size: 13.5px;
+  border-top: 2px solid var(--border-strong); border-bottom: 2px solid var(--border-strong);
+}
+.report tr.spacer td { height: 12px; padding: 0; }
+.report tr.subtle td { color: var(--text-2); }
+.report tr.zero td:not(.label):not(.code) { color: var(--text-3); }
+.report tr.clickable { cursor: pointer; }
+.report tr.clickable:hover .label { text-decoration: underline; text-underline-offset: 3px; }
+.report thead th.period { text-align: right; }
+.report thead th.period .m { display: block; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: -.01em; }
+
+/* --------------------------------------------------------------- KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.kpi .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+.kpi .v { font-size: 22px; font-weight: 650; margin-top: 5px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.kpi .s { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+.kpi .v.neg { color: var(--critical); }
+.kpi .v.pos { color: var(--good); }
+
+/* ---------------------------------------------------------------- messages */
+.banner {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px;
+  border-radius: var(--radius); border: 1px solid var(--border); font-size: 13px; margin-bottom: 12px;
+}
+.banner .ico { flex: none; font-weight: 700; }
+.banner.ok       { border-color: var(--good);     background: color-mix(in srgb, var(--good) 8%, transparent); }
+.banner.warn     { border-color: var(--warning);  background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.banner.critical { border-color: var(--critical); background: color-mix(in srgb, var(--critical) 8%, transparent); }
+.banner.info     { border-color: var(--accent);   background: var(--accent-soft); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; border: 1px solid var(--border-strong); color: var(--text-2);
+  white-space: nowrap;
+}
+.badge.auto     { border-color: var(--accent);   color: var(--accent); }
+.badge.manual   { border-color: var(--good);     color: var(--good); }
+.badge.none     { border-color: var(--critical); color: var(--critical); }
+.badge.import   { border-color: var(--border-strong); color: var(--text-2); }
+.badge.low      { border-color: var(--warning);  color: #8a6100; }
+:root[data-theme="dark"] .badge.low, :root:not([data-theme="light"]) .badge.low { color: var(--warning); }
+
+#toasts { position: fixed; right: 16px; bottom: 16px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--surface); border: 1px solid var(--border-strong); border-left: 3px solid var(--accent);
+  border-radius: 6px; padding: 10px 14px; box-shadow: var(--shadow); font-size: 13px; max-width: 380px;
+}
+.toast.err { border-left-color: var(--critical); }
+.toast.ok  { border-left-color: var(--good); }
+
+/* ----------------------------------------------------------------- charts */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: -1px; }
+svg .grid { stroke: var(--border); stroke-width: 1; }
+svg .axis { fill: var(--text-3); font-size: 10.5px; }
+svg .dlabel { fill: var(--text-2); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+svg .bar:hover { opacity: .82; }
+
+/* ------------------------------------------------------------------ modal */
+dialog {
+  border: 1px solid var(--border-strong); border-radius: 10px; padding: 0;
+  background: var(--surface); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.28);
+  width: min(620px, calc(100vw - 32px));
+}
+dialog::backdrop { background: rgba(0, 0, 0, .42); }
+dialog header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 600; }
+dialog .body { padding: 18px; max-height: 62vh; overflow: auto; }
+dialog footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.form-grid .wide { grid-column: 1 / -1; }
+
+/* --------------------------------------------------------------- dropzone */
+.dropzone {
+  border: 2px dashed var(--border-strong); border-radius: var(--radius);
+  padding: 34px; text-align: center; color: var(--text-2); cursor: pointer; background: var(--surface);
+}
+.dropzone.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.dropzone strong { display: block; font-size: 15px; color: var(--text); margin-bottom: 4px; }
+
+.checkline { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.empty { padding: 34px; text-align: center; color: var(--text-3); }
+.spin { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border-strong);
+  border-top-color: var(--accent); border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+.rowsel { width: 32px; }
+tr.selected { background: var(--accent-soft) !important; }
+.txn-desc { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* SVG charts scale to their container; height comes from the viewBox ratio. */
+.card svg { display: block; width: 100%; height: auto; }

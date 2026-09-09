@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Burn Rate Analysis</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔥</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><strong>Burn Rate Analysis</strong><span id="entityName">—</span></div>
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-view="dashboard" aria-current="page">Dashboard</button>
+    <button class="tab" data-view="transactions">Transactions<span class="pill" id="reviewPill" hidden>0</span></button>
+    <button class="tab" data-view="accounts">Accounts &amp; Reconciliation</button>
+    <button class="tab" data-view="import">Import</button>
+    <button class="tab" data-view="rules">Rules</button>
+    <button class="tab" data-view="coa">Chart of Accounts</button>
+  </nav>
+</header>
+
+<main>
+  <section class="view active" id="view-dashboard"></section>
+  <section class="view" id="view-transactions"></section>
+  <section class="view" id="view-accounts"></section>
+  <section class="view" id="view-import"></section>
+  <section class="view" id="view-rules"></section>
+  <section class="view" id="view-coa"></section>
+</main>
+
+<div id="toasts"></div>
+<dialog id="modal"></dialog>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
