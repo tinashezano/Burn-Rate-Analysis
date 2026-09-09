@@ -8,7 +8,7 @@ import { getDb } from './db.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
 const PORT = Number(process.env.PORT) || 4000;
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const MAX_UPLOAD = 40 * 1024 * 1024;
 
 const MIME = {
