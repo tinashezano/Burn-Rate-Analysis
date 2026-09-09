@@ -32,6 +32,18 @@ source workbook. They map to document paths by filename: `meta_config.json` to
 `meta/config`, `meta_periods.json` to `meta/periods`, and each
 `txns_<period>.json` to `txns/<period>`.
 
+## Verifying it
+
+```bash
+npm install --no-save playwright   # not a runtime dependency
+npm run test:page
+```
+
+`verify.mjs` serves the page locally behind a stub document store loaded from
+`seed/`, then reads the figures off the running page and checks them against
+the workbook: 25 checks covering the headline lines, the three workbook errors
+this build corrects, and a nil difference for every month and every account.
+
 ## Updating the page
 
 Edit `burn-rate.html` and republish it to the same artifact URL. The database

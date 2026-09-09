@@ -11,7 +11,8 @@
     "start": "node --no-warnings server/index.js",
     "seed": "node --no-warnings scripts/seed.js",
     "reset": "node --no-warnings scripts/seed.js --reset",
-    "test": "node --no-warnings test/parse.test.js && node --no-warnings test/verify.js"
+    "test": "node --no-warnings test/parse.test.js && node --no-warnings test/verify.js",
+    "test:page": "node artifact/verify.mjs"
   },
   "dependencies": {
     "xlsx": "^0.18.5"
